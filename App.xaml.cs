@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Reflection;
 using System.Windows;
 using Microsoft.Win32;
 using Forms = System.Windows.Forms;
@@ -25,7 +26,13 @@ public partial class App : Application
 
         try
         {
-            if (!string.IsNullOrWhiteSpace(Environment.ProcessPath))
+            using var iconStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Minimemizer.AppIcon.ico");
+            if (iconStream is not null)
+            {
+                using var embeddedIcon = new Icon(iconStream);
+                _trayIcon = new Icon(embeddedIcon, Forms.SystemInformation.SmallIconSize);
+            }
+            else if (!string.IsNullOrWhiteSpace(Environment.ProcessPath))
                 _trayIcon = Icon.ExtractAssociatedIcon(Environment.ProcessPath);
         }
         catch { _trayIcon = null; }
