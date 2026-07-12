@@ -13,9 +13,7 @@ public partial class App : Application
     private SettingsStore? _store;
     private SettingsWindow? _settingsWindow;
     private Icon? _trayIcon;
-    private Forms.ToolStripItem? _settingsMenuItem;
-    private Forms.ToolStripItem? _exitMenuItem;
-    private Forms.ContextMenuStrip? _trayMenu;
+    private TrayMenuWindow? _trayMenuWindow;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -25,14 +23,6 @@ public partial class App : Application
         _manager = new WindowManager(_store);
         _manager.Start();
 
-        var menu = new Forms.ContextMenuStrip();
-        _trayMenu = menu;
-        _settingsMenuItem = menu.Items.Add("", null, (_, _) => ShowSettings());
-        menu.Items.Add(new Forms.ToolStripSeparator());
-        _exitMenuItem = menu.Items.Add("", null, (_, _) => Shutdown());
-        menu.Opening += (_, _) => TrayMenuTheme.Apply(menu);
-        menu.Opened += (_, _) => TrayMenuTheme.ApplyRoundedRegion(menu);
-        TrayMenuTheme.Apply(menu);
         try
         {
             if (!string.IsNullOrWhiteSpace(Environment.ProcessPath))
@@ -43,14 +33,19 @@ public partial class App : Application
         {
             Text = "Minimemizer",
             Icon = _trayIcon ?? SystemIcons.Application,
-            Visible = true,
-            ContextMenuStrip = menu
+            Visible = true
         };
         _tray.DoubleClick += (_, _) => ShowSettings();
-        UpdateTrayLanguage();
+        _tray.MouseUp += (_, args) =>
+        {
+            if (args.Button == Forms.MouseButtons.Right)
+                Dispatcher.Invoke(ShowTrayMenu);
+        };
         SystemEvents.DisplaySettingsChanged += DisplaySettingsChanged;
         if (e.Args.Contains("--settings", StringComparer.OrdinalIgnoreCase))
             Dispatcher.BeginInvoke(ShowSettings);
+        if (e.Args.Contains("--tray-menu", StringComparer.OrdinalIgnoreCase))
+            Dispatcher.BeginInvoke(ShowTrayMenu);
     }
 
     private void DisplaySettingsChanged(object? sender, EventArgs e) => Dispatcher.Invoke(() => _manager?.Relayout());
@@ -60,17 +55,18 @@ public partial class App : Application
         if (_store is null || _manager is null) return;
         if (_settingsWindow is { IsVisible: true }) { _settingsWindow.Activate(); return; }
         _settingsWindow = new SettingsWindow(_store, _manager);
-        _settingsWindow.LanguageChanged += (_, _) => UpdateTrayLanguage();
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
         _settingsWindow.Activate();
     }
 
-    private void UpdateTrayLanguage()
+    private void ShowTrayMenu()
     {
         if (_store is null) return;
-        if (_settingsMenuItem is not null) _settingsMenuItem.Text = Localizer.T(_store.Current.Language, "Indstillinger");
-        if (_exitMenuItem is not null) _exitMenuItem.Text = Localizer.T(_store.Current.Language, "Afslut");
+        _trayMenuWindow?.Close();
+        _trayMenuWindow = new TrayMenuWindow(_store.Current.Language, ShowSettings, Shutdown);
+        _trayMenuWindow.Closed += (_, _) => _trayMenuWindow = null;
+        _trayMenuWindow.ShowNearCursor();
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -78,7 +74,7 @@ public partial class App : Application
         SystemEvents.DisplaySettingsChanged -= DisplaySettingsChanged;
         _manager?.Dispose();
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); }
-        _trayMenu?.Dispose();
+        _trayMenuWindow?.Close();
         _trayIcon?.Dispose();
         base.OnExit(e);
     }
