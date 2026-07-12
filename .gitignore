@@ -1,0 +1,19 @@
+# .NET build output
+bin/
+obj/
+release/
+
+# IDE and user files
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Test and generated temporary files
+.buildcheck/
+.settings-qa.png
+*.tmp
+
+# OS files
+Thumbs.db
+.DS_Store
