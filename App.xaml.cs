@@ -15,6 +15,7 @@ public partial class App : Application
     private Icon? _trayIcon;
     private Forms.ToolStripItem? _settingsMenuItem;
     private Forms.ToolStripItem? _exitMenuItem;
+    private Forms.ContextMenuStrip? _trayMenu;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -25,9 +26,13 @@ public partial class App : Application
         _manager.Start();
 
         var menu = new Forms.ContextMenuStrip();
+        _trayMenu = menu;
         _settingsMenuItem = menu.Items.Add("", null, (_, _) => ShowSettings());
         menu.Items.Add(new Forms.ToolStripSeparator());
         _exitMenuItem = menu.Items.Add("", null, (_, _) => Shutdown());
+        menu.Opening += (_, _) => TrayMenuTheme.Apply(menu);
+        menu.Opened += (_, _) => TrayMenuTheme.ApplyRoundedRegion(menu);
+        TrayMenuTheme.Apply(menu);
         try
         {
             if (!string.IsNullOrWhiteSpace(Environment.ProcessPath))
@@ -73,6 +78,7 @@ public partial class App : Application
         SystemEvents.DisplaySettingsChanged -= DisplaySettingsChanged;
         _manager?.Dispose();
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); }
+        _trayMenu?.Dispose();
         _trayIcon?.Dispose();
         base.OnExit(e);
     }
