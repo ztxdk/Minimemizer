@@ -5,7 +5,6 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using Microsoft.Win32;
 using Forms = System.Windows.Forms;
-using Button = System.Windows.Controls.Button;
 using Brush = System.Windows.Media.Brush;
 using Brushes = System.Windows.Media.Brushes;
 using Color = System.Windows.Media.Color;
@@ -54,19 +53,20 @@ internal sealed class TrayMenuWindow : Window
         };
     }
 
-    private static Button MenuButton(string glyph, string text, Brush foreground, Brush hover, Action action)
+    private static Border MenuButton(string glyph, string text, Brush foreground, Brush hover, Action action)
     {
         var content = new Grid();
         content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
         content.ColumnDefinitions.Add(new ColumnDefinition());
-        content.Children.Add(new TextBlock { Text = glyph, FontFamily = new FontFamily("Segoe UI Symbol"), FontSize = 14, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center });
-        var label = new TextBlock { Text = text, FontFamily = new FontFamily("Segoe UI"), FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
+        content.Children.Add(new TextBlock { Text = glyph, Foreground = foreground, FontFamily = new FontFamily("Segoe UI Symbol"), FontSize = 14, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center });
+        var label = new TextBlock { Text = text, Foreground = foreground, FontFamily = new FontFamily("Segoe UI"), FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(label, 1); content.Children.Add(label);
-        var button = new Button { Content = content, Height = 34, Foreground = foreground, Background = Brushes.Transparent, BorderThickness = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(3, 0, 7, 0) };
+        content.Margin = new Thickness(3, 0, 7, 0);
+        var button = new Border { Child = content, Height = 34, Background = Brushes.Transparent, CornerRadius = new CornerRadius(5), Cursor = System.Windows.Input.Cursors.Hand };
         var normal = Brushes.Transparent;
         button.MouseEnter += (_, _) => button.Background = hover;
         button.MouseLeave += (_, _) => button.Background = normal;
-        button.Click += (_, _) => action();
+        button.MouseLeftButtonUp += (_, e) => { e.Handled = true; action(); };
         return button;
     }
 
