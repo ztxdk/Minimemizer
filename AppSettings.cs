@@ -27,6 +27,6 @@ public sealed class AppSettings
     public bool EnableThumbnailContextMenu { get; set; } = true;
     public ThumbnailSizeMode SizeMode { get; set; } = ThumbnailSizeMode.Adaptive;
     public UniformContentMode UniformContent { get; set; } = UniformContentMode.Crop;
-    public AppLanguage Language { get; set; } = AppLanguage.Danish;
+    public AppLanguage Language { get; set; } = AppLanguage.English;
     public List<string> ExcludedPaths { get; set; } = [];
 }

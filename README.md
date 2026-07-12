@@ -1,118 +1,144 @@
-# Minimemizer
+<p align="center">
+  <img src="assets/minimemizer-icon.png" alt="Minimemizer icon" width="160" height="160">
+</p>
 
-Minimemizer gør minimerede programmer synlige som små thumbnails på Windows 11-skrivebordet. Klik på en thumbnail for hurtigt at gendanne programmet.
+<h1 align="center">Minimemizer</h1>
 
-Programikonet er indlejret i alle officielle ARM64- og x64-udgaver og bruges også i systembakken.
+<p align="center">
+  Turn minimized Windows applications into customizable desktop thumbnails.
+</p>
 
-## Kom godt i gang
+Minimemizer is a Windows 11 utility that displays minimized applications as live thumbnails on the desktop. Click a thumbnail to quickly restore its application.
 
-1. Start `Minimemizer.exe`.
-2. Minimér et almindeligt program.
-3. En thumbnail af programmet vises på skrivebordet.
-4. Enkelt- eller dobbeltklik på thumbnailen for at åbne programmet igen.
+The application icon is embedded in all official ARM64 and x64 builds and is also used in the system tray.
 
-Minimemizer kører i baggrunden og vises som et ikon i systembakken ved siden af Windows-uret. Højreklik på ikonet for at åbne **Indstillinger** eller afslutte programmet.
+## Getting started
 
-> Hvis systembakkeikonet ikke er synligt, kan det ligge under pilen **Vis skjulte ikoner**.
+1. Download the correct build from the [latest release](https://github.com/ztxdk/Minimemizer/releases/latest).
+2. Start `Minimemizer.exe`.
+3. Minimize a regular application.
+4. A thumbnail of the application appears on the desktop.
+5. Single- or double-click the thumbnail to restore the application.
 
-## Systemkrav
+Minimemizer runs in the background and appears in the system tray next to the Windows clock. Right-click the tray icon to open **Settings** or exit the application.
+
+> If the tray icon is not visible, it may be located under **Show hidden icons**.
+
+## Choosing a download
+
+| Build | Recommended for | .NET requirement |
+|---|---|---|
+| `win-x64-self-contained` | Most Intel and AMD Windows 11 PCs | None |
+| `win-arm64-self-contained` | Windows 11 ARM64 devices | None |
+| `win-x64-requires-dotnet8` | Intel/AMD PCs with .NET already installed | .NET 8 Desktop Runtime |
+| `win-arm64-requires-dotnet8` | ARM64 devices with .NET already installed | .NET 8 Desktop Runtime |
+
+The self-contained builds are larger because they include the .NET and WPF runtimes. The `requires-dotnet8` builds are much smaller but require the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0).
+
+## System requirements
 
 - Windows 11
-- En framework-afhængig udgave kræver Microsoft .NET 8 Desktop Runtime
-- En selvstændig udgave kræver ikke en separat .NET-installation
+- Administrator privileges are normally not required
+- Framework-dependent builds require Microsoft .NET 8 Desktop Runtime
 
-Programmet kræver normalt ikke administratorrettigheder.
+## Settings
 
-## Indstillinger
+The settings window follows the Windows light or dark theme. The interface supports English and Danish, with English as the default language. Changes are applied when you select **Save**. **Cancel** closes the window without saving.
 
-Indstillingsvinduet følger Windows' dark/light mode og kan vises på dansk eller engelsk. Ændringer træder først i kraft, når du vælger **Gem**. **Annuller** lukker vinduet uden at gemme.
+### General
 
-### Generelt
+- **Language:** Choose English or Danish.
+- **Start with Windows:** Start Minimemizer automatically when you sign in.
+- **Open thumbnail:** Choose single-click or double-click.
+- **Right-click menu:** Show the application's classic window menu, including Restore, Maximize, and Close.
 
-- **Sprog:** Vælg dansk eller engelsk.
-- **Start med Windows:** Start automatisk, når du logger ind.
-- **Åbn thumbnail:** Vælg enkeltklik eller dobbeltklik.
-- **Højrekliksmenu:** Vis programmets klassiske vinduesmenu med blandt andet Gendan, Maksimér og Luk.
+### Appearance
 
-### Udseende
+- Choose the maximum thumbnail width and height.
+- Use an adaptive size or give every thumbnail a uniform size.
+- With a uniform size, crop the window to the frame or show the entire window.
+- Choose no frame, square corners, or rounded Windows 11 corners.
+- Adjust thumbnail opacity with the slider.
+- Show or hide the application icon and position it along the top or bottom of the thumbnail.
 
-- Vælg thumbnailens maksimale bredde og højde.
-- Brug **Adaptiv** størrelse, eller giv alle thumbnails **Ens størrelse**.
-- Ved ens størrelse kan vinduet beskæres til rammen eller vises komplet.
-- Vælg ingen ramme, skarpe hjørner eller afrundede Windows 11-hjørner.
-- Justér gennemsigtigheden med slideren.
-- Vis eller skjul programmets ikon, og placér det langs thumbnailens top eller bund.
+A live preview shows how appearance changes will look.
 
-Et live preview viser, hvordan ændringerne kommer til at se ud.
+### Placement
 
-### Placering
+- Select the display where thumbnails should appear.
+- Select a starting corner.
+- Arrange thumbnails horizontally or vertically.
+- Adjust the spacing between thumbnails and the display edge.
 
-- Vælg hvilken skærm thumbnails skal vises på.
-- Vælg et hjørne som startpunkt.
-- Placér thumbnails vandret eller lodret.
-- Justér afstanden mellem thumbnails og afstanden til skærmens kant.
+If the available space is insufficient, all thumbnails are scaled down automatically.
 
-Hvis der ikke er plads til alle thumbnails, skaleres de automatisk ned.
+### Applications
 
-### Programmer
+Add applications that Minimemizer should ignore. Exclusions are stored using the application's `.exe` path.
 
-Tilføj programmer, som Minimemizer skal ignorere. Ekskludering gemmes ud fra programmets `.exe`-fil.
+### About
 
-### Om
+Displays the Minimemizer version and the architecture of both the application build and the Windows system. Version 0.5 is available for ARM64 and x64.
 
-Viser Minimemizers versionsnummer og arkitekturen for både programudgaven og Windows-systemet. Version 0.5 udgives til ARM64 og x64.
+## Everyday use
 
-## Daglig brug
+- A thumbnail is created automatically when an application is minimized.
+- The thumbnail is removed when the application is restored or closed.
+- Right-click a thumbnail to open the application's classic Windows menu when the option is enabled.
+- Exit Minimemizer through the system tray icon. If it becomes unresponsive, it can be closed using Task Manager.
 
-- Når et program minimeres, oprettes thumbnailen automatisk.
-- Når programmet gendannes eller lukkes, fjernes thumbnailen.
-- Højreklik på en thumbnail for at åbne programmets klassiske Windows-vinduesmenu, hvis funktionen er aktiveret.
-- Afslut altid Minimemizer gennem systembakkeikonet. Hvis programmet ikke reagerer, kan det afsluttes via Jobliste.
+## Known limitations
 
-## Begrænsninger
+- Windows does not provide an official API for placing third-party elements directly between the desktop background and desktop icons. Thumbnails are therefore placed at the bottom of the regular window order.
+- Protected video, DRM content, and some specially rendered applications may display a black, empty, or frozen preview.
+- Applications running with elevated administrator privileges may not always be fully controllable by a normally started Minimemizer process.
+- Windows 11 taskbar jump lists cannot be opened for other applications through a public Windows API. Thumbnail right-click therefore uses the classic window menu.
 
-- Windows tilbyder ikke et officielt API til at placere tredjepartselementer direkte mellem skrivebordsbaggrunden og skrivebordsikonerne. Thumbnails placeres derfor nederst blandt almindelige vinduer.
-- Beskyttet video, DRM-indhold og enkelte specialrenderede programmer kan vise en sort, tom eller fastfrosset forhåndsvisning.
-- Programmer med højere administratorrettigheder kan i enkelte tilfælde ikke styres fuldt ud fra en normalt startet Minimemizer.
-- Windows 11's moderne taskbar-jumplist kan ikke åbnes for andre programmer via et offentligt Windows-API. Højreklik bruger derfor den klassiske vinduesmenu.
+## Troubleshooting
 
-## Fejlfinding
+### No thumbnail appears
 
-### Der kommer ingen thumbnail
+- Confirm that Minimemizer is still running in the system tray.
+- Check the **Applications** settings page to ensure the application is not excluded.
+- Restore the application and minimize it again.
+- Restart Minimemizer.
 
-- Kontrollér, at Minimemizer stadig kører i systembakken.
-- Kontrollér under **Programmer**, at programmet ikke er ekskluderet.
-- Gendan programmet og minimér det igen.
-- Genstart Minimemizer.
+### The thumbnail is black or frozen
 
-### Thumbnailen er sort eller frossen
+The application may use protected or specialized rendering that Windows does not expose as a live thumbnail. This cannot always be worked around.
 
-Programmet bruger sandsynligvis beskyttet eller specialiseret rendering, som Windows ikke stiller til rådighed som en live thumbnail. Dette kan ikke altid omgås.
+### Settings look incorrect after an update
 
-### Indstillingerne ser forkerte ud efter en opdatering
+Exit all older Minimemizer processes through the system tray or Task Manager, then start the latest `Minimemizer.exe`.
 
-Afslut alle ældre Minimemizer-processer via systembakken eller Jobliste, og start derefter den nyeste `Minimemizer.exe`.
-
-Indstillinger gemmes for den aktuelle Windows-bruger i:
+Settings are stored for the current Windows user in:
 
 ```text
 %APPDATA%\Minimemizer\settings.json
 ```
 
-Hvis filen slettes, gendannes standardindstillingerne ved næste start.
+Deleting this file restores the default settings on the next launch.
 
-## For udviklere
+## Development
 
-Kør fra kildekoden:
+Run from source:
 
 ```powershell
 dotnet run
 ```
 
-Byg en selvstændig Windows x64-version:
+Create a self-contained Windows x64 build:
 
 ```powershell
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 ```
 
-Output findes under `bin/Release/net8.0-windows/win-x64/publish`.
+Create a self-contained Windows ARM64 build:
+
+```powershell
+dotnet publish -c Release -r win-arm64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+```
+
+## License
+
+No license file has been added yet. All rights are reserved unless a license is added to the repository.
