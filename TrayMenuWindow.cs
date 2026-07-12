@@ -11,14 +11,17 @@ using Brushes = System.Windows.Media.Brushes;
 using Color = System.Windows.Media.Color;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
 using FontFamily = System.Windows.Media.FontFamily;
+using Application = System.Windows.Application;
 
 namespace Minimemizer;
 
 internal sealed class TrayMenuWindow : Window
 {
+    private bool _isClosing;
+
     internal TrayMenuWindow(AppLanguage language, Action openSettings, Action exit)
     {
-        Width = 220;
+        Width = 172;
         SizeToContent = SizeToContent.Height;
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
@@ -34,19 +37,19 @@ internal sealed class TrayMenuWindow : Window
         var hover = new SolidColorBrush(dark ? Color.FromRgb(62, 62, 62) : Color.FromRgb(232, 232, 232));
         var borderBrush = new SolidColorBrush(dark ? Color.FromRgb(82, 82, 82) : Color.FromRgb(205, 205, 205));
 
-        var stack = new StackPanel { Margin = new Thickness(5) };
-        stack.Children.Add(MenuButton("⚙", Localizer.T(language, "Indstillinger"), foreground, hover, () => { Close(); openSettings(); }));
-        stack.Children.Add(new Border { Height = 1, Background = borderBrush, Margin = new Thickness(9, 4, 9, 4) });
-        stack.Children.Add(MenuButton("⏻", Localizer.T(language, "Afslut"), foreground, hover, () => { Close(); exit(); }));
+        var stack = new StackPanel { Margin = new Thickness(4) };
+        stack.Children.Add(MenuButton("⚙", Localizer.T(language, "Indstillinger"), foreground, hover, () => RunAndClose(openSettings)));
+        stack.Children.Add(new Border { Height = 1, Background = borderBrush, Margin = new Thickness(7, 2, 7, 2) });
+        stack.Children.Add(MenuButton("⏻", Localizer.T(language, "Afslut"), foreground, hover, () => RunAndClose(exit)));
 
         Content = new Border
         {
             Background = background,
             BorderBrush = borderBrush,
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10),
+            CornerRadius = new CornerRadius(8),
             Padding = new Thickness(1),
-            Effect = new DropShadowEffect { BlurRadius = 18, ShadowDepth = 4, Opacity = dark ? .5 : .25 },
+            Effect = new DropShadowEffect { BlurRadius = 10, ShadowDepth = 2, Opacity = dark ? .42 : .2 },
             Child = stack
         };
     }
@@ -54,12 +57,12 @@ internal sealed class TrayMenuWindow : Window
     private static Button MenuButton(string glyph, string text, Brush foreground, Brush hover, Action action)
     {
         var content = new Grid();
-        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
         content.ColumnDefinitions.Add(new ColumnDefinition());
-        content.Children.Add(new TextBlock { Text = glyph, FontFamily = new FontFamily("Segoe UI Symbol"), FontSize = 16, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center });
-        var label = new TextBlock { Text = text, FontFamily = new FontFamily("Segoe UI"), FontSize = 14, VerticalAlignment = VerticalAlignment.Center };
+        content.Children.Add(new TextBlock { Text = glyph, FontFamily = new FontFamily("Segoe UI Symbol"), FontSize = 14, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center });
+        var label = new TextBlock { Text = text, FontFamily = new FontFamily("Segoe UI"), FontSize = 13, VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(label, 1); content.Children.Add(label);
-        var button = new Button { Content = content, Height = 42, Foreground = foreground, Background = Brushes.Transparent, BorderThickness = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(5, 0, 10, 0) };
+        var button = new Button { Content = content, Height = 34, Foreground = foreground, Background = Brushes.Transparent, BorderThickness = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(3, 0, 7, 0) };
         var normal = Brushes.Transparent;
         button.MouseEnter += (_, _) => button.Background = hover;
         button.MouseLeave += (_, _) => button.Background = normal;
@@ -82,7 +85,20 @@ internal sealed class TrayMenuWindow : Window
         Left = x / scale;
         Top = y / scale;
         Activate();
-        Deactivated += (_, _) => Close();
+        Deactivated += (_, _) => Dismiss();
+    }
+
+    private void RunAndClose(Action action)
+    {
+        Dismiss();
+        Application.Current.Dispatcher.BeginInvoke(action);
+    }
+
+    private void Dismiss()
+    {
+        if (_isClosing) return;
+        _isClosing = true;
+        Close();
     }
 
     private static bool IsDarkMode()
