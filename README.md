@@ -78,7 +78,7 @@ Add applications that Minimemizer should ignore. Exclusions are stored using the
 
 ### About
 
-Displays the Minimemizer version and the architecture of both the application build and the Windows system. Version 0.5.3 is available for ARM64 and x64.
+Displays the Minimemizer version and the architecture of both the application build and the Windows system. Version 0.5.4 is available for ARM64 and x64.
 
 ## Everyday use
 

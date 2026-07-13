@@ -13,6 +13,7 @@ public sealed class WindowManager : IDisposable
     private readonly NativeMethods.WinEventDelegate _callback;
     private nint _minimizeHook;
     private nint _destroyHook;
+    private nint _cloakHook;
     private readonly DispatcherTimer _scanTimer;
     private bool _disposed;
 
@@ -32,6 +33,7 @@ public sealed class WindowManager : IDisposable
         var flags = NativeMethods.WINEVENT_OUTOFCONTEXT | NativeMethods.WINEVENT_SKIPOWNPROCESS;
         _minimizeHook = NativeMethods.SetWinEventHook(NativeMethods.EVENT_SYSTEM_MINIMIZESTART, NativeMethods.EVENT_SYSTEM_MINIMIZEEND, 0, _callback, 0, 0, flags);
         _destroyHook = NativeMethods.SetWinEventHook(NativeMethods.EVENT_OBJECT_DESTROY, NativeMethods.EVENT_OBJECT_DESTROY, 0, _callback, 0, 0, flags);
+        _cloakHook = NativeMethods.SetWinEventHook(NativeMethods.EVENT_OBJECT_CLOAKED, NativeMethods.EVENT_OBJECT_UNCLOAKED, 0, _callback, 0, 0, flags);
         NativeMethods.EnumWindows((hwnd, _) => { if (NativeMethods.IsIconic(hwnd)) Add(hwnd); return true; }, 0);
         _scanTimer.Start();
     }
@@ -39,27 +41,53 @@ public sealed class WindowManager : IDisposable
     private void OnWinEvent(nint hook, uint eventType, nint hwnd, int idObject, int idChild, uint eventThread, uint eventTime)
     {
         if (hwnd == 0 || _disposed) return;
+        var objectEvent = eventType is NativeMethods.EVENT_OBJECT_DESTROY
+            or NativeMethods.EVENT_OBJECT_CLOAKED
+            or NativeMethods.EVENT_OBJECT_UNCLOAKED;
+        if (objectEvent && (idObject != NativeMethods.OBJID_WINDOW || idChild != NativeMethods.CHILDID_SELF)) return;
         Application.Current.Dispatcher.BeginInvoke(() =>
         {
-            if (eventType == NativeMethods.EVENT_SYSTEM_MINIMIZESTART) Add(hwnd);
-            else if (eventType == NativeMethods.EVENT_SYSTEM_MINIMIZEEND || eventType == NativeMethods.EVENT_OBJECT_DESTROY) Remove(hwnd);
+            if (_disposed) return;
+            if (eventType == NativeMethods.EVENT_SYSTEM_MINIMIZESTART)
+            {
+                if (NativeMethods.IsIconic(hwnd) && !NativeMethods.IsWindowCloaked(hwnd)) Add(hwnd);
+            }
+            else if (eventType == NativeMethods.EVENT_SYSTEM_MINIMIZEEND)
+            {
+                if (!NativeMethods.IsIconic(hwnd)) Remove(hwnd);
+            }
+            else if (eventType is NativeMethods.EVENT_OBJECT_DESTROY or NativeMethods.EVENT_OBJECT_CLOAKED)
+                Remove(hwnd);
+            else if (eventType == NativeMethods.EVENT_OBJECT_UNCLOAKED && NativeMethods.IsIconic(hwnd))
+                Add(hwnd);
         });
     }
 
-    private void Add(nint hwnd)
+    private bool Add(nint hwnd, bool relayout = true)
     {
-        if (_thumbnails.ContainsKey(hwnd) || !IsEligible(hwnd)) return;
+        if (_disposed || !NativeMethods.IsIconic(hwnd) || !IsEligible(hwnd)) return false;
+        if (_thumbnails.TryGetValue(hwnd, out var existing))
+        {
+            if (existing.MatchesSource(hwnd)) return false;
+            Remove(hwnd, relayout: false);
+        }
         var titleBuffer = new StringBuilder(512);
         NativeMethods.GetWindowText(hwnd, titleBuffer, titleBuffer.Capacity);
         var window = new ThumbnailWindow(hwnd, titleBuffer.ToString(), NativeMethods.GetProcessPath(hwnd));
         _thumbnails.Add(hwnd, window);
         window.Show();
-        Relayout();
+        if (!window.HasRegisteredThumbnail || !NativeMethods.IsWindow(hwnd) || !NativeMethods.IsIconic(hwnd) || NativeMethods.IsWindowCloaked(hwnd))
+        {
+            Remove(hwnd, relayout: false);
+            return false;
+        }
+        if (relayout) Relayout();
+        return true;
     }
 
     private bool IsEligible(nint hwnd)
     {
-        if (!NativeMethods.IsWindow(hwnd) || !NativeMethods.IsWindowVisible(hwnd)) return false;
+        if (!NativeMethods.IsWindow(hwnd) || !NativeMethods.IsWindowVisible(hwnd) || NativeMethods.IsWindowCloaked(hwnd)) return false;
         var owner = NativeMethods.GetWindow(hwnd, 4); // GW_OWNER
         var style = NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GWL_EXSTYLE).ToInt64();
         if ((style & NativeMethods.WS_EX_TOOLWINDOW) != 0) return false;
@@ -72,11 +100,12 @@ public sealed class WindowManager : IDisposable
         return !_store.Current.ExcludedPaths.Contains(path, StringComparer.OrdinalIgnoreCase);
     }
 
-    private void Remove(nint hwnd)
+    private bool Remove(nint hwnd, bool relayout = true)
     {
-        if (!_thumbnails.Remove(hwnd, out var window)) return;
+        if (!_thumbnails.Remove(hwnd, out var window)) return false;
         window.Close();
-        Relayout();
+        if (relayout) Relayout();
+        return true;
     }
 
     public void Refresh()
@@ -94,9 +123,22 @@ public sealed class WindowManager : IDisposable
 
     private void ScanWindows()
     {
-        foreach (var hwnd in _thumbnails.Keys.ToArray())
-            if (!NativeMethods.IsWindow(hwnd) || !NativeMethods.IsIconic(hwnd) || !IsEligible(hwnd)) Remove(hwnd);
-        NativeMethods.EnumWindows((hwnd, _) => { if (NativeMethods.IsIconic(hwnd)) Add(hwnd); return true; }, 0);
+        if (_disposed) return;
+        var changed = false;
+        foreach (var pair in _thumbnails.ToArray())
+        {
+            if (!NativeMethods.IsWindow(pair.Key) ||
+                !NativeMethods.IsIconic(pair.Key) ||
+                !IsEligible(pair.Key) ||
+                !pair.Value.MatchesSource(pair.Key))
+                changed |= Remove(pair.Key, relayout: false);
+        }
+        NativeMethods.EnumWindows((hwnd, _) =>
+        {
+            if (NativeMethods.IsIconic(hwnd)) changed |= Add(hwnd, relayout: false);
+            return true;
+        }, 0);
+        if (changed) Relayout();
     }
 
     public void Relayout()
@@ -156,6 +198,7 @@ public sealed class WindowManager : IDisposable
         _scanTimer.Stop();
         if (_minimizeHook != 0) NativeMethods.UnhookWinEvent(_minimizeHook);
         if (_destroyHook != 0) NativeMethods.UnhookWinEvent(_destroyHook);
+        if (_cloakHook != 0) NativeMethods.UnhookWinEvent(_cloakHook);
         foreach (var window in _thumbnails.Values.ToArray()) window.Close();
         _thumbnails.Clear();
     }

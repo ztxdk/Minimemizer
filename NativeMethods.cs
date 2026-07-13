@@ -8,9 +8,13 @@ internal static class NativeMethods
     internal const uint EVENT_SYSTEM_MINIMIZESTART = 0x0016;
     internal const uint EVENT_SYSTEM_MINIMIZEEND = 0x0017;
     internal const uint EVENT_OBJECT_DESTROY = 0x8001;
+    internal const uint EVENT_OBJECT_CLOAKED = 0x8017;
+    internal const uint EVENT_OBJECT_UNCLOAKED = 0x8018;
     internal const uint WINEVENT_OUTOFCONTEXT = 0;
     internal const uint WINEVENT_SKIPOWNPROCESS = 2;
     internal const int OBJID_WINDOW = 0;
+    internal const int CHILDID_SELF = 0;
+    internal const int DWMWA_CLOAKED = 14;
     internal const int GWL_EXSTYLE = -20;
     internal const long WS_EX_TOOLWINDOW = 0x00000080L;
     internal const long WS_EX_APPWINDOW = 0x00040000L;
@@ -63,6 +67,7 @@ internal static class NativeMethods
     [DllImport("dwmapi.dll")] internal static extern int DwmUpdateThumbnailProperties(nint thumbnail, ref DwmThumbnailProperties properties);
     [DllImport("dwmapi.dll")] internal static extern int DwmQueryThumbnailSourceSize(nint thumbnail, out Size sourceSize);
     [DllImport("dwmapi.dll")] internal static extern int DwmSetWindowAttribute(nint hwnd, int attribute, ref int value, int valueSize);
+    [DllImport("dwmapi.dll")] internal static extern int DwmGetWindowAttribute(nint hwnd, int attribute, out int value, int valueSize);
     [DllImport("dwmapi.dll")] internal static extern int DwmExtendFrameIntoClientArea(nint hwnd, ref Margins margins);
 
     [StructLayout(LayoutKind.Sequential)] internal struct Rect { public int Left, Top, Right, Bottom; }
@@ -92,4 +97,7 @@ internal static class NativeMethods
         }
         finally { CloseHandle(process); }
     }
+
+    internal static bool IsWindowCloaked(nint hwnd) =>
+        DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, out var cloaked, sizeof(int)) == 0 && cloaked != 0;
 }

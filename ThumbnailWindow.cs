@@ -9,6 +9,8 @@ namespace Minimemizer;
 internal sealed class ThumbnailWindow : Window
 {
     private readonly nint _source;
+    private readonly uint _sourceProcessId;
+    private readonly uint _sourceThreadId;
     private nint _thumbnail;
     private nint _handle;
     private int _pixelWidth;
@@ -30,6 +32,7 @@ internal sealed class ThumbnailWindow : Window
     internal ThumbnailWindow(nint source, string title, string executablePath)
     {
         _source = source;
+        _sourceThreadId = NativeMethods.GetWindowThreadProcessId(source, out _sourceProcessId);
         _executablePath = executablePath;
         Title = title;
         WindowStyle = WindowStyle.None;
@@ -46,6 +49,7 @@ internal sealed class ThumbnailWindow : Window
         };
         Content = _frameBorder;
         Topmost = false;
+        ShowActivated = false;
         SourceInitialized += OnSourceInitialized;
         Closed += (_, _) => Unregister();
         Deactivated += (_, _) => SendToBottom();
@@ -57,6 +61,16 @@ internal sealed class ThumbnailWindow : Window
             e.Handled = true;
             ShowSourceSystemMenu();
         };
+    }
+
+    internal bool HasRegisteredThumbnail => _thumbnail != 0;
+
+    internal bool MatchesSource(nint source)
+    {
+        if (source != _source || _thumbnail == 0) return false;
+        var threadId = NativeMethods.GetWindowThreadProcessId(source, out var processId);
+        return threadId != 0 && threadId == _sourceThreadId && processId == _sourceProcessId &&
+               NativeMethods.DwmQueryThumbnailSourceSize(_thumbnail, out _) == 0;
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)

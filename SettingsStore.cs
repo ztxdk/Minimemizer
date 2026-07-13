@@ -35,7 +35,19 @@ public sealed class SettingsStore
         Current.Gap = Math.Clamp(Current.Gap, 0, 100);
         Current.EdgeMargin = Math.Clamp(Current.EdgeMargin, 0, 200);
         Current.ThumbnailOpacity = Math.Clamp(Current.ThumbnailOpacity, 20, 100);
-        Current.ExcludedPaths = Current.ExcludedPaths.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase).Order().ToList();
+        Current.ScreenDeviceName ??= "";
+        Current.ExcludedPaths = (Current.ExcludedPaths ?? [])
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (!Enum.IsDefined(Current.Corner)) Current.Corner = ScreenCorner.BottomRight;
+        if (!Enum.IsDefined(Current.Flow)) Current.Flow = ThumbnailFlow.Horizontal;
+        if (!Enum.IsDefined(Current.FrameStyle)) Current.FrameStyle = ThumbnailFrameStyle.None;
+        if (!Enum.IsDefined(Current.IconPosition)) Current.IconPosition = ThumbnailIconPosition.TopRight;
+        if (!Enum.IsDefined(Current.SizeMode)) Current.SizeMode = ThumbnailSizeMode.Adaptive;
+        if (!Enum.IsDefined(Current.UniformContent)) Current.UniformContent = UniformContentMode.Crop;
+        if (!Enum.IsDefined(Current.Language)) Current.Language = AppLanguage.English;
     }
 
     private void ApplyAutoStart()
