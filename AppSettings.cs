@@ -20,6 +20,7 @@ public sealed class AppSettings
     public ThumbnailFlow Flow { get; set; } = ThumbnailFlow.Horizontal;
     public bool AutoStart { get; set; }
     public bool ShowProgramIcon { get; set; } = true;
+    public bool ShowTitleOnHover { get; set; } = true;
     public bool RestoreOnSingleClick { get; set; }
     public ThumbnailFrameStyle FrameStyle { get; set; } = ThumbnailFrameStyle.None;
     public ThumbnailIconPosition IconPosition { get; set; } = ThumbnailIconPosition.TopRight;

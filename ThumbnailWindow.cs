@@ -26,6 +26,7 @@ internal sealed class ThumbnailWindow : Window
     private int _opacityPercent = 100;
     private bool _contextMenuEnabled = true;
     private readonly Border _frameBorder;
+    private readonly System.Windows.Controls.ToolTip _titleToolTip;
     private ThumbnailSizeMode _sizeMode = ThumbnailSizeMode.Adaptive;
     private UniformContentMode _uniformContent = UniformContentMode.Crop;
 
@@ -35,6 +36,17 @@ internal sealed class ThumbnailWindow : Window
         _sourceThreadId = NativeMethods.GetWindowThreadProcessId(source, out _sourceProcessId);
         _executablePath = executablePath;
         Title = title;
+        _titleToolTip = new System.Windows.Controls.ToolTip
+        {
+            Content = new TextBlock
+            {
+                Text = title,
+                MaxWidth = 420,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            }
+        };
+        ToolTipService.SetInitialShowDelay(this, 450);
+        ToolTipService.SetShowDuration(this, 10000);
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
         ShowInTaskbar = false;
@@ -121,6 +133,8 @@ internal sealed class ThumbnailWindow : Window
     }
 
     internal void SetContextMenuEnabled(bool enabled) => _contextMenuEnabled = enabled;
+
+    internal void SetTitleTooltipEnabled(bool enabled) => ToolTip = enabled ? _titleToolTip : null;
 
     internal void SetThumbnailOpacity(int opacityPercent)
     {

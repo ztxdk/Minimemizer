@@ -60,6 +60,7 @@ The settings window follows the Windows light or dark theme. The interface suppo
 - Choose no frame, square corners, or rounded Windows 11 corners.
 - Adjust thumbnail opacity with the slider.
 - Show or hide the application icon and position it along the top or bottom of the thumbnail.
+- Show or hide the application title tooltip that appears when the pointer rests on a thumbnail.
 
 A live preview shows how appearance changes will look.
 
@@ -78,7 +79,7 @@ Add applications that Minimemizer should ignore. Exclusions are stored using the
 
 ### About
 
-Displays the Minimemizer version and the architecture of both the application build and the Windows system. Version 0.5.4 is available for ARM64 and x64.
+Displays the Minimemizer version and the architecture of both the application build and the Windows system. Version 0.5.5 is available for ARM64 and x64.
 
 ## Everyday use
 

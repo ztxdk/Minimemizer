@@ -145,6 +145,7 @@ public sealed class SettingsWindow : Window
         panel.Children.Add(FluentCard.Create(T("Programikon"), T("Vis programmets ikon oven på thumbnailen."), Toggle(_draft.ShowProgramIcon, value => { _draft.ShowProgramIcon = value; _iconPosition.IsEnabled = value; Preview(); })));
         ConfigureChoice(_iconPosition, IconChoices(), _draft.IconPosition, value => { _draft.IconPosition = value; Preview(); }); _iconPosition.IsEnabled = _draft.ShowProgramIcon;
         panel.Children.Add(FluentCard.Create(T("Ikonplacering"), T("Vælg ikonets placering på thumbnailen."), _iconPosition));
+        panel.Children.Add(FluentCard.Create(T("Titel ved hover"), T("Vis programmets titel, når musen holdes over thumbnailen."), Toggle(_draft.ShowTitleOnHover, value => _draft.ShowTitleOnHover = value)));
         return Scroll(panel);
     }
 
@@ -178,7 +179,7 @@ public sealed class SettingsWindow : Window
     {
         var panel = PagePanel();
         var assemblyVersion = Assembly.GetExecutingAssembly().GetName().Version;
-        var version = assemblyVersion is null ? "0.5.4" : $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
+        var version = assemblyVersion is null ? "0.5.5" : $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
         panel.Children.Add(FluentCard.Create(T("Version"), T("Den installerede version af Minimemizer."), ValueText(version)));
         panel.Children.Add(FluentCard.Create(T("Arkitektur"), T("Den processorarkitektur denne udgave er bygget til."), ValueText(ArchitectureName(RuntimeInformation.ProcessArchitecture))));
         panel.Children.Add(FluentCard.Create(T("System"), T("Den Windows-arkitektur programmet kører på."), ValueText(ArchitectureName(RuntimeInformation.OSArchitecture))));

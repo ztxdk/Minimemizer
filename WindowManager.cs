@@ -185,6 +185,7 @@ public sealed class WindowManager : IDisposable
             item.Window.SetIconPosition(settings.IconPosition);
             item.Window.SetThumbnailOpacity(settings.ThumbnailOpacity);
             item.Window.SetContextMenuEnabled(settings.EnableThumbnailContextMenu);
+            item.Window.SetTitleTooltipEnabled(settings.ShowTitleOnHover);
             item.Window.ApplyBounds(x, y, width, height);
             item.Window.SetIconVisibility(settings.ShowProgramIcon);
             item.Window.SetRestoreOnSingleClick(settings.RestoreOnSingleClick);

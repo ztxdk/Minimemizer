@@ -38,6 +38,8 @@ internal static class Localizer
         ["Juster thumbnailens synlighed."] = "Adjust thumbnail visibility.",
         ["Programikon"] = "Application icon",
         ["Vis programmets ikon oven på thumbnailen."] = "Show the application icon over the thumbnail.",
+        ["Titel ved hover"] = "Title on hover",
+        ["Vis programmets titel, når musen holdes over thumbnailen."] = "Show the application's title when the pointer rests on the thumbnail.",
         ["Vælg ikonets placering på thumbnailen."] = "Choose the icon position on the thumbnail.",
         ["Skærmen hvor thumbnails skal placeres."] = "The display where thumbnails are placed.",
         ["Startpunktet for rækken af thumbnails."] = "The starting corner for the thumbnail row.",
