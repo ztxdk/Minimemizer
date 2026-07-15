@@ -179,7 +179,7 @@ public sealed class SettingsWindow : Window
     {
         var panel = PagePanel();
         var assemblyVersion = Assembly.GetExecutingAssembly().GetName().Version;
-        var version = assemblyVersion is null ? "0.5.5" : $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
+        var version = assemblyVersion is null ? "0.5.6" : $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
         panel.Children.Add(FluentCard.Create(T("Version"), T("Den installerede version af Minimemizer."), ValueText(version)));
         panel.Children.Add(FluentCard.Create(T("Arkitektur"), T("Den processorarkitektur denne udgave er bygget til."), ValueText(ArchitectureName(RuntimeInformation.ProcessArchitecture))));
         panel.Children.Add(FluentCard.Create(T("System"), T("Den Windows-arkitektur programmet kører på."), ValueText(ArchitectureName(RuntimeInformation.OSArchitecture))));

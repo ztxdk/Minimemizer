@@ -41,7 +41,13 @@ internal sealed class IconBadgeWindow : Window
             Padding = new Thickness(4),
             Child = _iconImage
         };
-        SourceInitialized += (_, _) => _handle = new WindowInteropHelper(this).Handle;
+        SourceInitialized += (_, _) =>
+        {
+            _handle = new WindowInteropHelper(this).Handle;
+            var style = NativeMethods.GetWindowLongPtr(_handle, NativeMethods.GWL_EXSTYLE).ToInt64();
+            style = (style | NativeMethods.WS_EX_TOOLWINDOW | NativeMethods.WS_EX_NOACTIVATE) & ~NativeMethods.WS_EX_APPWINDOW;
+            NativeMethods.SetWindowLongPtr(_handle, NativeMethods.GWL_EXSTYLE, new nint(style));
+        };
     }
 
     internal bool HasIcon => Content is not null;

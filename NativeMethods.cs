@@ -16,9 +16,11 @@ internal static class NativeMethods
     internal const int CHILDID_SELF = 0;
     internal const int DWMWA_CLOAKED = 14;
     internal const int GWL_EXSTYLE = -20;
+    internal const int GWLP_HWNDPARENT = -8;
     internal const long WS_EX_TOOLWINDOW = 0x00000080L;
     internal const long WS_EX_APPWINDOW = 0x00040000L;
     internal const long WS_EX_LAYERED = 0x00080000L;
+    internal const long WS_EX_NOACTIVATE = 0x08000000L;
     internal const uint LWA_ALPHA = 0x00000002;
     internal const int SW_RESTORE = 9;
     internal const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
@@ -28,9 +30,10 @@ internal static class NativeMethods
     internal const uint DWM_TNP_OPACITY = 0x00000004;
     internal const uint DWM_TNP_SOURCECLIENTAREAONLY = 0x00000010;
     internal static readonly nint HWND_BOTTOM = new(1);
-    internal const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOACTIVATE = 0x0010;
+    internal const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOZORDER = 0x0004, SWP_NOACTIVATE = 0x0010, SWP_FRAMECHANGED = 0x0020;
     internal const uint TPM_RETURNCMD = 0x0100, TPM_RIGHTBUTTON = 0x0002;
     internal const uint WM_SYSCOMMAND = 0x0112, SC_RESTORE = 0xF120;
+    internal const int WM_ACTIVATE = 0x0006, WA_INACTIVE = 0;
 
     internal delegate void WinEventDelegate(nint hook, uint eventType, nint hwnd, int idObject, int idChild, uint eventThread, uint eventTime);
     internal delegate bool EnumWindowsProc(nint hwnd, nint lParam);

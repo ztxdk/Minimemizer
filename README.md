@@ -79,11 +79,12 @@ Add applications that Minimemizer should ignore. Exclusions are stored using the
 
 ### About
 
-Displays the Minimemizer version and the architecture of both the application build and the Windows system. Version 0.5.5 is available for ARM64 and x64.
+Displays the Minimemizer version and the architecture of both the application build and the Windows system. Version 0.5.6 is available for ARM64 and x64.
 
 ## Everyday use
 
 - A thumbnail is created automatically when an application is minimized.
+- Thumbnail windows are excluded from Windows Task View and Alt+Tab.
 - The thumbnail is removed when the application is restored or closed.
 - Right-click a thumbnail to open the application's classic Windows menu when the option is enabled.
 - Exit Minimemizer through the system tray icon. If it becomes unresponsive, it can be closed using Task Manager.

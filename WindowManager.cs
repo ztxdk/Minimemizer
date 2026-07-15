@@ -9,6 +9,7 @@ namespace Minimemizer;
 public sealed class WindowManager : IDisposable
 {
     private readonly SettingsStore _store;
+    private readonly TaskViewOwnerWindow _taskViewOwner;
     private readonly Dictionary<nint, ThumbnailWindow> _thumbnails = [];
     private readonly NativeMethods.WinEventDelegate _callback;
     private nint _minimizeHook;
@@ -20,6 +21,7 @@ public sealed class WindowManager : IDisposable
     public WindowManager(SettingsStore store)
     {
         _store = store;
+        _taskViewOwner = new TaskViewOwnerWindow();
         _callback = OnWinEvent;
         _scanTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -73,9 +75,11 @@ public sealed class WindowManager : IDisposable
         }
         var titleBuffer = new StringBuilder(512);
         NativeMethods.GetWindowText(hwnd, titleBuffer, titleBuffer.Capacity);
-        var window = new ThumbnailWindow(hwnd, titleBuffer.ToString(), NativeMethods.GetProcessPath(hwnd));
+        var window = new ThumbnailWindow(hwnd, titleBuffer.ToString(), NativeMethods.GetProcessPath(hwnd),
+            _taskViewOwner.WindowHandle);
         _thumbnails.Add(hwnd, window);
         window.Show();
+        window.EnableActivationFallback();
         if (!window.HasRegisteredThumbnail || !NativeMethods.IsWindow(hwnd) || !NativeMethods.IsIconic(hwnd) || NativeMethods.IsWindowCloaked(hwnd))
         {
             Remove(hwnd, relayout: false);
@@ -202,5 +206,6 @@ public sealed class WindowManager : IDisposable
         if (_cloakHook != 0) NativeMethods.UnhookWinEvent(_cloakHook);
         foreach (var window in _thumbnails.Values.ToArray()) window.Close();
         _thumbnails.Clear();
+        _taskViewOwner.Dispose();
     }
 }
