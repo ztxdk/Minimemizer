@@ -14,7 +14,6 @@ internal sealed class ThumbnailWindow : Window
     private readonly nint _taskViewOwner;
     private nint _thumbnail;
     private nint _handle;
-    private HwndSource? _hwndSource;
     private int _pixelWidth;
     private int _pixelHeight;
     private int _pixelX;
@@ -29,9 +28,6 @@ internal sealed class ThumbnailWindow : Window
     private bool _contextMenuEnabled = true;
     private readonly Border _frameBorder;
     private readonly System.Windows.Controls.ToolTip _titleToolTip;
-    private bool _activationFallbackEnabled;
-    private bool _activationRestoreQueued;
-    private bool _suppressActivationRestore;
     private ThumbnailSizeMode _sizeMode = ThumbnailSizeMode.Adaptive;
     private UniformContentMode _uniformContent = UniformContentMode.Crop;
 
@@ -71,6 +67,9 @@ internal sealed class ThumbnailWindow : Window
         SourceInitialized += OnSourceInitialized;
         Closed += (_, _) => Unregister();
         Deactivated += (_, _) => SendToBottom();
+        // Keep restoration exclusively in these mouse handlers. Restoring from
+        // WM_ACTIVATE bypasses RestoreOnSingleClick because an ordinary click can
+        // activate the thumbnail before WPF has evaluated the configured click mode.
         MouseLeftButtonUp += (_, _) => { if (_restoreOnSingleClick) Restore(); };
         MouseDoubleClick += (_, e) => { if (!_restoreOnSingleClick && e.ChangedButton == MouseButton.Left) Restore(); };
         MouseRightButtonUp += (_, e) =>
@@ -83,8 +82,6 @@ internal sealed class ThumbnailWindow : Window
 
     internal bool HasRegisteredThumbnail => _thumbnail != 0;
 
-    internal void EnableActivationFallback() => _activationFallbackEnabled = true;
-
     internal bool MatchesSource(nint source)
     {
         if (source != _source || _thumbnail == 0) return false;
@@ -96,10 +93,9 @@ internal sealed class ThumbnailWindow : Window
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
         _handle = new WindowInteropHelper(this).Handle;
-        _hwndSource = HwndSource.FromHwnd(_handle);
-        if (_hwndSource?.CompositionTarget is not null)
-            _hwndSource.CompositionTarget.BackgroundColor = System.Windows.Media.Color.FromArgb(0, 0, 0, 0);
-        _hwndSource?.AddHook(WindowProc);
+        var hwndSource = HwndSource.FromHwnd(_handle);
+        if (hwndSource?.CompositionTarget is not null)
+            hwndSource.CompositionTarget.BackgroundColor = System.Windows.Media.Color.FromArgb(0, 0, 0, 0);
         ApplyTaskViewMode();
         var glass = new NativeMethods.Margins { Left = -1, Right = -1, Top = -1, Bottom = -1 };
         NativeMethods.DwmExtendFrameIntoClientArea(_handle, ref glass);
@@ -156,22 +152,6 @@ internal sealed class ThumbnailWindow : Window
         NativeMethods.SetWindowPos(_handle, 0, 0, 0, 0, 0,
             NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOZORDER |
             NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_FRAMECHANGED);
-    }
-
-    private nint WindowProc(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
-    {
-        if (message == NativeMethods.WM_ACTIVATE &&
-            (wParam.ToInt64() & 0xFFFF) != NativeMethods.WA_INACTIVE &&
-            _activationFallbackEnabled && !_suppressActivationRestore && !_activationRestoreQueued)
-        {
-            _activationRestoreQueued = true;
-            Dispatcher.BeginInvoke(() =>
-            {
-                _activationRestoreQueued = false;
-                if (!_suppressActivationRestore) Restore();
-            });
-        }
-        return 0;
     }
 
     internal void SetThumbnailOpacity(int opacityPercent)
@@ -289,14 +269,8 @@ internal sealed class ThumbnailWindow : Window
         if (!NativeMethods.IsWindow(_source) || _handle == 0) return;
         var menu = NativeMethods.GetSystemMenu(_source, false);
         if (menu == 0 || !NativeMethods.GetCursorPos(out var point)) return;
-        uint command;
-        _suppressActivationRestore = true;
-        try
-        {
-            NativeMethods.SetForegroundWindow(_handle);
-            command = NativeMethods.TrackPopupMenuEx(menu, NativeMethods.TPM_RETURNCMD | NativeMethods.TPM_RIGHTBUTTON, point.X, point.Y, _handle, 0);
-        }
-        finally { _suppressActivationRestore = false; }
+        NativeMethods.SetForegroundWindow(_handle);
+        var command = NativeMethods.TrackPopupMenuEx(menu, NativeMethods.TPM_RETURNCMD | NativeMethods.TPM_RIGHTBUTTON, point.X, point.Y, _handle, 0);
         if (command == 0) return;
         if ((command & 0xFFF0) == NativeMethods.SC_RESTORE) Restore();
         else NativeMethods.PostMessage(_source, NativeMethods.WM_SYSCOMMAND, new nint(command), 0);
@@ -305,8 +279,6 @@ internal sealed class ThumbnailWindow : Window
 
     private void Unregister()
     {
-        _hwndSource?.RemoveHook(WindowProc);
-        _hwndSource = null;
         if (_thumbnail != 0) { NativeMethods.DwmUnregisterThumbnail(_thumbnail); _thumbnail = 0; }
     }
 }

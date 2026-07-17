@@ -33,7 +33,6 @@ internal static class NativeMethods
     internal const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOZORDER = 0x0004, SWP_NOACTIVATE = 0x0010, SWP_FRAMECHANGED = 0x0020;
     internal const uint TPM_RETURNCMD = 0x0100, TPM_RIGHTBUTTON = 0x0002;
     internal const uint WM_SYSCOMMAND = 0x0112, SC_RESTORE = 0xF120;
-    internal const int WM_ACTIVATE = 0x0006, WA_INACTIVE = 0;
 
     internal delegate void WinEventDelegate(nint hook, uint eventType, nint hwnd, int idObject, int idChild, uint eventThread, uint eventTime);
     internal delegate bool EnumWindowsProc(nint hwnd, nint lParam);

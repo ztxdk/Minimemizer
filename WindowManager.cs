@@ -79,7 +79,6 @@ public sealed class WindowManager : IDisposable
             _taskViewOwner.WindowHandle);
         _thumbnails.Add(hwnd, window);
         window.Show();
-        window.EnableActivationFallback();
         if (!window.HasRegisteredThumbnail || !NativeMethods.IsWindow(hwnd) || !NativeMethods.IsIconic(hwnd) || NativeMethods.IsWindowCloaked(hwnd))
         {
             Remove(hwnd, relayout: false);

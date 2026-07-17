@@ -79,7 +79,7 @@ Add applications that Minimemizer should ignore. Exclusions are stored using the
 
 ### About
 
-Displays the Minimemizer version and the architecture of both the application build and the Windows system. Version 0.5.6 is available for ARM64 and x64.
+Displays the Minimemizer version and the architecture of both the application build and the Windows system. Version 0.5.7 is available for ARM64 and x64.
 
 ## Everyday use
 
@@ -128,6 +128,16 @@ Run from source:
 ```powershell
 dotnet run
 ```
+
+### Regression checks
+
+When changing thumbnail ownership, Task View/Alt+Tab behavior, native window styles, or activation handling, verify both values of **Open thumbnail**:
+
+- In **Double-click** mode, one click must not restore the source window; a double-click must restore it.
+- In **Single-click** mode, one click must restore the source window.
+- Thumbnail and icon-badge windows must remain absent from Task View and Alt+Tab.
+
+Do not restore the source window from thumbnail activation messages such as `WM_ACTIVATE`. A normal mouse click can activate a window before the configured single-/double-click handler runs, which makes both settings behave as single-click.
 
 Create a self-contained Windows x64 build:
 
