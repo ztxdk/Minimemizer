@@ -18,6 +18,7 @@ internal static class NativeMethods
     internal const int GWL_EXSTYLE = -20;
     internal const int GWLP_HWNDPARENT = -8;
     internal const long WS_EX_TOOLWINDOW = 0x00000080L;
+    internal const long WS_EX_TRANSPARENT = 0x00000020L;
     internal const long WS_EX_APPWINDOW = 0x00040000L;
     internal const long WS_EX_LAYERED = 0x00080000L;
     internal const long WS_EX_NOACTIVATE = 0x08000000L;
@@ -59,10 +60,15 @@ internal static class NativeMethods
     [DllImport("user32.dll")] internal static extern nint GetSystemMenu(nint hwnd, bool revert);
     [DllImport("user32.dll")] internal static extern uint TrackPopupMenuEx(nint menu, uint flags, int x, int y, nint owner, nint parameters);
     [DllImport("user32.dll")] internal static extern bool GetCursorPos(out Point point);
+    internal delegate nint LowLevelMouseProc(int code, nint wParam, nint lParam);
+    [DllImport("user32.dll")] internal static extern nint SetWindowsHookEx(int hookId, LowLevelMouseProc callback, nint module, uint threadId);
+    [DllImport("user32.dll")] internal static extern bool UnhookWindowsHookEx(nint hook);
+    [DllImport("user32.dll")] internal static extern nint CallNextHookEx(nint hook, int code, nint wParam, nint lParam);
     [DllImport("user32.dll")] internal static extern bool PostMessage(nint hwnd, uint message, nint wParam, nint lParam);
     [DllImport("kernel32.dll")] internal static extern nint OpenProcess(uint access, bool inherit, uint processId);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] internal static extern bool QueryFullProcessImageName(nint process, uint flags, StringBuilder name, ref uint size);
     [DllImport("kernel32.dll")] internal static extern bool CloseHandle(nint handle);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] internal static extern nint GetModuleHandle(string? moduleName);
 
     [DllImport("dwmapi.dll")] internal static extern int DwmRegisterThumbnail(nint destination, nint source, out nint thumbnail);
     [DllImport("dwmapi.dll")] internal static extern int DwmUnregisterThumbnail(nint thumbnail);

@@ -9,6 +9,8 @@ using System.Windows.Media;
 using Microsoft.Win32;
 using Forms = System.Windows.Forms;
 using Button = System.Windows.Controls.Button;
+using ContextMenu = System.Windows.Controls.ContextMenu;
+using MenuItem = System.Windows.Controls.MenuItem;
 using CheckBox = System.Windows.Controls.CheckBox;
 using ComboBox = System.Windows.Controls.ComboBox;
 using TextBox = System.Windows.Controls.TextBox;
@@ -22,6 +24,7 @@ using Control = System.Windows.Controls.Control;
 using SystemColors = System.Windows.SystemColors;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
 using Color = System.Windows.Media.Color;
+using Path = System.IO.Path;
 
 namespace Minimemizer;
 
@@ -36,6 +39,7 @@ public sealed class SettingsWindow : Window
     private readonly TextBlock _pageDescription = new() { FontSize = 13, Opacity = .7, Margin = new Thickness(0, 4, 0, 18) };
     private ThumbnailPreview _preview = new();
     private ListBox _exclusions = new();
+    private ListBox _zoneRules = new();
     private ComboBox _contentMode = new(), _iconPosition = new();
     private bool _isDark;
     public event EventHandler? LanguageChanged;
@@ -107,7 +111,7 @@ public sealed class SettingsWindow : Window
         {
             "appearance" => (T("Udseende"), T("Tilpas thumbnails, rammer, ikoner og gennemsigtighed."), BuildAppearancePage()),
             "placement" => (T("Placering"), T("Vælg skærm, retning og afstande."), BuildPlacementPage()),
-            "programs" => (T("Programmer"), T("Administrer programmer, der ikke skal have thumbnails."), BuildProgramsPage()),
+            "programs" => (T("Programmer"), T("Administrer undtagelser og programmernes standardzoner."), BuildProgramsPage()),
             "about" => (T("Om"), T("Information om Minimemizer og denne udgave."), BuildAboutPage()),
             _ => (T("Generelt"), T("Grundlæggende funktioner og programmets sprog."), BuildGeneralPage())
         };
@@ -153,7 +157,8 @@ public sealed class SettingsWindow : Window
     private UIElement BuildPlacementPage()
     {
         var panel = PagePanel();
-        var screens = Forms.Screen.AllScreens.Select(s => (s.DeviceName, $"{s.DeviceName} ({s.Bounds.Width} × {s.Bounds.Height})")).ToArray();
+        var availableScreens = Forms.Screen.AllScreens;
+        var screens = availableScreens.Select(s => (s.DeviceName, $"{ThumbnailZones.DisplayLabel(UiLanguage, s.DeviceName, availableScreens)} ({s.Bounds.Width} × {s.Bounds.Height})")).ToArray();
         var selectedScreen = screens.Any(x => x.DeviceName == _draft.ScreenDeviceName) ? _draft.ScreenDeviceName : screens.FirstOrDefault().DeviceName ?? "";
         panel.Children.Add(FluentCard.Create(T("Skærm"), T("Skærmen hvor thumbnails skal placeres."), Choice(screens, selectedScreen, value => _draft.ScreenDeviceName = value)));
         panel.Children.Add(FluentCard.Create(T("Hjørne"), T("Startpunktet for rækken af thumbnails."), Choice(CornerChoices(), _draft.Corner, value => _draft.Corner = value)));
@@ -165,22 +170,42 @@ public sealed class SettingsWindow : Window
 
     private UIElement BuildProgramsPage()
     {
-        _exclusions = new ListBox();
-        var grid = new Grid(); grid.RowDefinitions.Add(new RowDefinition()); grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        _exclusions.ItemsSource = _draft.ExcludedPaths.Order(StringComparer.OrdinalIgnoreCase).ToArray(); _exclusions.Margin = new Thickness(0, 0, 0, 12);
-        grid.Children.Add(_exclusions);
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal };
+        _exclusions = new ListBox { Height = 120, Margin = new Thickness(0, 0, 0, 10) };
+        _zoneRules = new ListBox { Height = 150, Margin = new Thickness(0, 0, 0, 10) };
+        var panel = PagePanel();
+        panel.Children.Add(SectionHeading(T("Programmer, der ikke skal have thumbnails")));
+        panel.Children.Add(_exclusions);
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 22) };
         var add = MakeButton(T("Tilføj program…"), false); add.Click += AddExclusion;
         var remove = MakeButton(T("Fjern valgte"), false); remove.Margin = new Thickness(8, 0, 0, 0); remove.Click += (_, _) => { if (_exclusions.SelectedItem is string item) { _draft.ExcludedPaths.Remove(item); RefreshExclusions(); } };
-        buttons.Children.Add(add); buttons.Children.Add(remove); Grid.SetRow(buttons, 1); grid.Children.Add(buttons);
-        return grid;
+        buttons.Children.Add(add); buttons.Children.Add(remove); panel.Children.Add(buttons);
+
+        panel.Children.Add(SectionHeading(T("Programzoner")));
+        panel.Children.Add(new TextBlock { Text = T("Vælg hvor thumbnails fra bestemte programmer som standard skal placeres."), Opacity = .68, FontSize = 12, Margin = new Thickness(0, 0, 0, 8), TextWrapping = TextWrapping.Wrap });
+        panel.Children.Add(_zoneRules);
+        var ruleButtons = new StackPanel { Orientation = Orientation.Horizontal };
+        var addRule = MakeButton(T("Tilføj regel…"), false); addRule.Click += AddZoneRule;
+        var changeRule = MakeButton(T("Skift zone…"), false); changeRule.Margin = new Thickness(8, 0, 0, 0); changeRule.Click += ChangeZoneRule;
+        var removeRule = MakeButton(T("Fjern regel"), false); removeRule.Margin = new Thickness(8, 0, 0, 0); removeRule.Click += (_, _) => RemoveZoneRule();
+        ruleButtons.Children.Add(addRule); ruleButtons.Children.Add(changeRule); ruleButtons.Children.Add(removeRule); panel.Children.Add(ruleButtons);
+        RefreshExclusions();
+        RefreshZoneRules();
+        return Scroll(panel);
     }
+
+    private static TextBlock SectionHeading(string text) => new()
+    {
+        Text = text,
+        FontSize = 15,
+        FontWeight = FontWeights.SemiBold,
+        Margin = new Thickness(0, 0, 0, 8)
+    };
 
     private UIElement BuildAboutPage()
     {
         var panel = PagePanel();
         var assemblyVersion = Assembly.GetExecutingAssembly().GetName().Version;
-        var version = assemblyVersion is null ? "0.5.8" : $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
+        var version = assemblyVersion is null ? "0.6.0" : $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
         panel.Children.Add(FluentCard.Create(T("Version"), T("Den installerede version af Minimemizer."), ValueText(version)));
         panel.Children.Add(FluentCard.Create(T("Arkitektur"), T("Den processorarkitektur denne udgave er bygget til."), ValueText(ArchitectureName(RuntimeInformation.ProcessArchitecture))));
         panel.Children.Add(FluentCard.Create(T("System"), T("Den Windows-arkitektur programmet kører på."), ValueText(ArchitectureName(RuntimeInformation.OSArchitecture))));
@@ -240,6 +265,78 @@ public sealed class SettingsWindow : Window
 
     private void RefreshExclusions() { _exclusions.ItemsSource = null; _exclusions.ItemsSource = _draft.ExcludedPaths.Order(StringComparer.OrdinalIgnoreCase).ToArray(); }
 
+    private void AddZoneRule(object sender, RoutedEventArgs e)
+    {
+        using var dialog = new Forms.OpenFileDialog { Filter = T("Programmer (*.exe)|*.exe"), Title = T("Vælg et program") };
+        if (dialog.ShowDialog() != Forms.DialogResult.OK) return;
+        var existing = _draft.ProgramZoneRules.FirstOrDefault(rule =>
+            string.Equals(rule.ExecutablePath, dialog.FileName, StringComparison.OrdinalIgnoreCase));
+        if (existing is null)
+        {
+            var defaultZone = ThumbnailZones.Resolve(ThumbnailZones.Default(_draft), _draft, Forms.Screen.AllScreens);
+            existing = new ProgramZoneRule
+            {
+                ExecutablePath = dialog.FileName,
+                ScreenDeviceName = defaultZone.ScreenDeviceName,
+                Corner = defaultZone.Corner
+            };
+            _draft.ProgramZoneRules.Add(existing);
+        }
+        RefreshZoneRules(existing);
+        if (sender is Button anchor) ShowZonePicker(anchor, existing);
+    }
+
+    private void ChangeZoneRule(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button anchor && _zoneRules.SelectedItem is ZoneRuleItem item)
+            ShowZonePicker(anchor, item.Rule);
+    }
+
+    private void ShowZonePicker(Button anchor, ProgramZoneRule rule)
+    {
+        var menu = FluentMenu.Create(_isDark);
+        menu.PlacementTarget = anchor;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        foreach (var screen in Forms.Screen.AllScreens)
+        {
+            var display = ThumbnailZones.DisplayLabel(UiLanguage, screen.DeviceName, Forms.Screen.AllScreens);
+            foreach (var corner in Enum.GetValues<ScreenCorner>())
+            {
+                var cornerItem = new MenuItem
+                {
+                    Header = $"{display} · {ThumbnailZones.CornerLabel(UiLanguage, corner)}",
+                    IsChecked = string.Equals(rule.ScreenDeviceName, screen.DeviceName, StringComparison.OrdinalIgnoreCase) && rule.Corner == corner
+                };
+                cornerItem.Click += (_, _) =>
+                {
+                    rule.ScreenDeviceName = screen.DeviceName;
+                    rule.Corner = corner;
+                    RefreshZoneRules(rule);
+                };
+                menu.Items.Add(cornerItem);
+            }
+        }
+        menu.IsOpen = true;
+    }
+
+    private void RemoveZoneRule()
+    {
+        if (_zoneRules.SelectedItem is not ZoneRuleItem item) return;
+        _draft.ProgramZoneRules.Remove(item.Rule);
+        RefreshZoneRules();
+    }
+
+    private void RefreshZoneRules(ProgramZoneRule? selected = null)
+    {
+        var items = _draft.ProgramZoneRules
+            .OrderBy(rule => rule.ExecutablePath, StringComparer.OrdinalIgnoreCase)
+            .Select(rule => new ZoneRuleItem(rule,
+                $"{Path.GetFileNameWithoutExtension(rule.ExecutablePath)}  →  {ThumbnailZones.DisplayLabel(UiLanguage, rule.ScreenDeviceName, Forms.Screen.AllScreens)} · {ThumbnailZones.CornerLabel(UiLanguage, rule.Corner)}"))
+            .ToArray();
+        _zoneRules.ItemsSource = items;
+        if (selected is not null) _zoneRules.SelectedItem = items.FirstOrDefault(item => ReferenceEquals(item.Rule, selected));
+    }
+
     private void Apply(object sender, RoutedEventArgs e) => PersistChanges(closeAfterSave: false);
 
     private void Save(object sender, RoutedEventArgs e) => PersistChanges(closeAfterSave: true);
@@ -264,7 +361,7 @@ public sealed class SettingsWindow : Window
 
     private void ApplySystemTheme()
     {
-        _isDark = IsDarkModeEnabled();
+        _isDark = AppTheme.IsDarkModeEnabled();
         var background = Brush(_isDark ? 32 : 243, _isDark ? 32 : 243, _isDark ? 32 : 243);
         var surface = Brush(_isDark ? 45 : 255, _isDark ? 45 : 255, _isDark ? 45 : 255);
         var foreground = Brush(_isDark ? 242 : 24, _isDark ? 242 : 24, _isDark ? 242 : 24);
@@ -297,7 +394,6 @@ public sealed class SettingsWindow : Window
 
     private static Style StyleOf(Type type, params (DependencyProperty Property, object Value)[] setters) { var style = new Style(type); foreach (var setter in setters) style.Setters.Add(new Setter(setter.Property, setter.Value)); return style; }
     private static SolidColorBrush Brush(int r, int g, int b) { var value = new SolidColorBrush(Color.FromRgb((byte)r, (byte)g, (byte)b)); value.Freeze(); return value; }
-    private static bool IsDarkModeEnabled() { try { using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"); return key?.GetValue("AppsUseLightTheme") is int value && value == 0; } catch { return false; } }
     private static IEnumerable<T> FindVisualChildren<T>(DependencyObject root) where T : DependencyObject { for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++) { var child = VisualTreeHelper.GetChild(root, i); if (child is T typed) yield return typed; foreach (var nested in FindVisualChildren<T>(child)) yield return nested; } }
 
     private static Style ComboStyle(bool dark)
@@ -354,4 +450,5 @@ public sealed class SettingsWindow : Window
     }
 
     private sealed record ChoiceItem<T>(T Value, string Label) { public override string ToString() => Label; }
+    private sealed record ZoneRuleItem(ProgramZoneRule Rule, string Label) { public override string ToString() => Label; }
 }

@@ -55,19 +55,20 @@ internal sealed class IconBadgeWindow : Window
     internal void ApplyPosition(int thumbnailX, int thumbnailY, int thumbnailWidth, int thumbnailHeight, ThumbnailIconPosition position, bool visible)
     {
         if (!HasIcon) return;
-        var ownerHandle = new WindowInteropHelper(_owner).Handle;
-        var scale = ownerHandle == 0 ? 1d : Math.Max(1d, NativeMethods.GetDpiForWindow(ownerHandle) / 96d);
         var onRight = position is ThumbnailIconPosition.TopRight or ThumbnailIconPosition.BottomRight;
         var centered = position is ThumbnailIconPosition.TopCenter or ThumbnailIconPosition.BottomCenter;
         var onBottom = position is ThumbnailIconPosition.BottomLeft or ThumbnailIconPosition.BottomRight;
         onBottom = onBottom || position == ThumbnailIconPosition.BottomCenter;
         var iconX = centered ? thumbnailX + (thumbnailWidth - BadgeSize) / 2 : onRight ? thumbnailX + thumbnailWidth - BadgeSize - 7 : thumbnailX + 7;
-        Left = iconX / scale;
-        Top = (onBottom ? thumbnailY + thumbnailHeight - BadgeSize - 7 : thumbnailY + 7) / scale;
-        Width = BadgeSize / scale;
-        Height = BadgeSize / scale;
+        var iconY = onBottom ? thumbnailY + thumbnailHeight - BadgeSize - 7 : thumbnailY + 7;
+        Left = iconX;
+        Top = iconY;
+        Width = BadgeSize;
+        Height = BadgeSize;
         if (visible && !IsVisible) Show();
         else if (!visible && IsVisible) Hide();
+        if (visible && _handle != 0)
+            NativeMethods.SetWindowPos(_handle, 0, iconX, iconY, BadgeSize, BadgeSize, NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_NOZORDER);
     }
 
     internal void SetOpacity(int opacityPercent)

@@ -9,6 +9,13 @@ public enum AppLanguage { Danish, English }
 // Keep the original numeric values stable because enums are persisted as numbers in settings.json.
 public enum ThumbnailIconPosition { TopLeft = 0, TopRight = 1, BottomLeft = 2, BottomRight = 3, TopCenter = 4, BottomCenter = 5 }
 
+public sealed class ProgramZoneRule
+{
+    public string ExecutablePath { get; set; } = "";
+    public string ScreenDeviceName { get; set; } = "";
+    public ScreenCorner Corner { get; set; } = ScreenCorner.BottomRight;
+}
+
 public sealed class AppSettings
 {
     public int ThumbnailWidth { get; set; } = 240;
@@ -30,4 +37,5 @@ public sealed class AppSettings
     public UniformContentMode UniformContent { get; set; } = UniformContentMode.Crop;
     public AppLanguage Language { get; set; } = AppLanguage.English;
     public List<string> ExcludedPaths { get; set; } = [];
+    public List<ProgramZoneRule> ProgramZoneRules { get; set; } = [];
 }

@@ -3,6 +3,12 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Controls;
+using Button = System.Windows.Controls.Button;
+using MouseEventArgs = System.Windows.Input.MouseEventArgs;
+using Brushes = System.Windows.Media.Brushes;
+using Color = System.Windows.Media.Color;
+using HorizontalAlignment = System.Windows.HorizontalAlignment;
+using Path = System.IO.Path;
 
 namespace Minimemizer;
 
@@ -27,9 +33,20 @@ internal sealed class ThumbnailWindow : Window
     private int _opacityPercent = 100;
     private bool _contextMenuEnabled = true;
     private readonly Border _frameBorder;
+    private readonly Button _zoneMenuButton;
     private readonly System.Windows.Controls.ToolTip _titleToolTip;
     private ThumbnailSizeMode _sizeMode = ThumbnailSizeMode.Adaptive;
     private UniformContentMode _uniformContent = UniformContentMode.Crop;
+    private NativeMethods.Point _dragStartCursor;
+    private int _dragOffsetX;
+    private int _dragOffsetY;
+    private bool _dragArmed;
+    private bool _isDragging;
+
+    internal event Action<ThumbnailWindow, NativeMethods.Point>? DragStarted;
+    internal event Action<ThumbnailWindow, NativeMethods.Point>? DragMoved;
+    internal event Action<ThumbnailWindow, NativeMethods.Point>? DragCompleted;
+    internal event Action<ThumbnailWindow, Button>? ZoneMenuRequested;
 
     internal ThumbnailWindow(nint source, string title, string executablePath, nint taskViewOwner)
     {
@@ -61,7 +78,33 @@ internal sealed class ThumbnailWindow : Window
             BorderThickness = new Thickness(0),
             IsHitTestVisible = false
         };
-        Content = _frameBorder;
+        _zoneMenuButton = new Button
+        {
+            Content = "⋯",
+            Width = 32,
+            Height = 28,
+            Margin = new Thickness(7),
+            Padding = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            Background = new SolidColorBrush(Color.FromArgb(220, 32, 32, 32)),
+            Foreground = Brushes.White,
+            BorderBrush = new SolidColorBrush(Color.FromArgb(180, 255, 255, 255)),
+            BorderThickness = new Thickness(1),
+            FontSize = 18,
+            FontWeight = FontWeights.SemiBold,
+            Visibility = Visibility.Collapsed,
+            ToolTip = "Minimemizer"
+        };
+        _zoneMenuButton.Click += (_, e) =>
+        {
+            e.Handled = true;
+            ZoneMenuRequested?.Invoke(this, _zoneMenuButton);
+        };
+        var root = new Grid { Background = Brushes.Transparent };
+        root.Children.Add(_frameBorder);
+        root.Children.Add(_zoneMenuButton);
+        Content = root;
         Topmost = false;
         ShowActivated = false;
         SourceInitialized += OnSourceInitialized;
@@ -70,8 +113,13 @@ internal sealed class ThumbnailWindow : Window
         // Keep restoration exclusively in these mouse handlers. Restoring from
         // WM_ACTIVATE bypasses RestoreOnSingleClick because an ordinary click can
         // activate the thumbnail before WPF has evaluated the configured click mode.
-        MouseLeftButtonUp += (_, _) => { if (_restoreOnSingleClick) Restore(); };
-        MouseDoubleClick += (_, e) => { if (!_restoreOnSingleClick && e.ChangedButton == MouseButton.Left) Restore(); };
+        MouseEnter += (_, _) => _zoneMenuButton.Visibility = Visibility.Visible;
+        MouseLeave += (_, _) => { if (!_zoneMenuButton.IsMouseOver) _zoneMenuButton.Visibility = Visibility.Collapsed; };
+        MouseLeftButtonDown += OnMouseLeftButtonDown;
+        MouseMove += OnMouseMove;
+        MouseLeftButtonUp += OnMouseLeftButtonUp;
+        LostMouseCapture += OnLostMouseCapture;
+        MouseDoubleClick += (_, e) => { if (!_isDragging && !_restoreOnSingleClick && e.ChangedButton == MouseButton.Left) Restore(); };
         MouseRightButtonUp += (_, e) =>
         {
             if (!_contextMenuEnabled) return;
@@ -81,6 +129,10 @@ internal sealed class ThumbnailWindow : Window
     }
 
     internal bool HasRegisteredThumbnail => _thumbnail != 0;
+    internal nint SourceHandle => _source;
+    internal uint SourceProcessId => _sourceProcessId;
+    internal string ExecutablePath => _executablePath;
+    internal string ProgramName => Path.GetFileNameWithoutExtension(_executablePath);
 
     internal bool MatchesSource(nint source)
     {
@@ -110,11 +162,67 @@ internal sealed class ThumbnailWindow : Window
         _pixelY = y;
         _pixelWidth = width;
         _pixelHeight = height;
-        var scale = _handle == 0 ? 1d : Math.Max(1d, NativeMethods.GetDpiForWindow(_handle) / 96d);
-        Left = x / scale; Top = y / scale; Width = width / scale; Height = height / scale;
+        if (_handle != 0)
+            NativeMethods.SetWindowPos(_handle, NativeMethods.HWND_BOTTOM, x, y, width, height, NativeMethods.SWP_NOACTIVATE);
+        else
+        {
+            Left = x;
+            Top = y;
+            Width = width;
+            Height = height;
+        }
         UpdateThumbnail();
-        SendToBottom();
         _iconBadge?.ApplyPosition(x, y, width, height, _iconPosition, _showIcon);
+    }
+
+    private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left || !NativeMethods.GetCursorPos(out _dragStartCursor)) return;
+        _dragOffsetX = _dragStartCursor.X - _pixelX;
+        _dragOffsetY = _dragStartCursor.Y - _pixelY;
+        _dragArmed = true;
+    }
+
+    private void OnMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_dragArmed || e.LeftButton != MouseButtonState.Pressed || !NativeMethods.GetCursorPos(out var cursor)) return;
+        if (!_isDragging)
+        {
+            var horizontal = Math.Abs(cursor.X - _dragStartCursor.X);
+            var vertical = Math.Abs(cursor.Y - _dragStartCursor.Y);
+            if (horizontal < SystemParameters.MinimumHorizontalDragDistance && vertical < SystemParameters.MinimumVerticalDragDistance) return;
+            _isDragging = true;
+            CaptureMouse();
+            _zoneMenuButton.Visibility = Visibility.Collapsed;
+            DragStarted?.Invoke(this, cursor);
+        }
+
+        ApplyBounds(cursor.X - _dragOffsetX, cursor.Y - _dragOffsetY, _pixelWidth, _pixelHeight);
+        DragMoved?.Invoke(this, cursor);
+        e.Handled = true;
+    }
+
+    private void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left) return;
+        _dragArmed = false;
+        if (_isDragging)
+        {
+            _isDragging = false;
+            if (IsMouseCaptured) ReleaseMouseCapture();
+            if (NativeMethods.GetCursorPos(out var cursor)) DragCompleted?.Invoke(this, cursor);
+            e.Handled = true;
+            return;
+        }
+        if (_restoreOnSingleClick) Restore();
+    }
+
+    private void OnLostMouseCapture(object sender, MouseEventArgs e)
+    {
+        if (!_isDragging) return;
+        _isDragging = false;
+        _dragArmed = false;
+        if (NativeMethods.GetCursorPos(out var cursor)) DragCompleted?.Invoke(this, cursor);
     }
 
     internal void SetIconVisibility(bool visible)

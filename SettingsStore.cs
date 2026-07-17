@@ -41,6 +41,18 @@ public sealed class SettingsStore
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        Current.ProgramZoneRules = (Current.ProgramZoneRules ?? [])
+            .Where(rule => rule is not null && !string.IsNullOrWhiteSpace(rule.ExecutablePath))
+            .Select(rule => new ProgramZoneRule
+            {
+                ExecutablePath = rule.ExecutablePath.Trim(),
+                ScreenDeviceName = rule.ScreenDeviceName?.Trim() ?? "",
+                Corner = Enum.IsDefined(rule.Corner) ? rule.Corner : ScreenCorner.BottomRight
+            })
+            .GroupBy(rule => rule.ExecutablePath, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last())
+            .OrderBy(rule => rule.ExecutablePath, StringComparer.OrdinalIgnoreCase)
+            .ToList();
         if (!Enum.IsDefined(Current.Corner)) Current.Corner = ScreenCorner.BottomRight;
         if (!Enum.IsDefined(Current.Flow)) Current.Flow = ThumbnailFlow.Horizontal;
         if (!Enum.IsDefined(Current.FrameStyle)) Current.FrameStyle = ThumbnailFrameStyle.None;

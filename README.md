@@ -66,27 +66,30 @@ A live preview shows how appearance changes will look.
 
 ### Placement
 
-- Select the display where thumbnails should appear.
-- Select a starting corner.
+- Select the default display and corner for thumbnails without a zone rule.
 - Arrange thumbnails horizontally or vertically.
 - Adjust the spacing between thumbnails and the display edge.
+- Drag a thumbnail to any corner on any connected display to move that window into the highlighted zone.
 
-If the available space is insufficient, all thumbnails are scaled down automatically.
+Each display has four independent corner zones. If the available space in a zone is insufficient, its thumbnails are scaled down automatically.
+Dragging changes only the selected window and is remembered while that window exists. If a configured display is disconnected, its thumbnails temporarily fall back to the default display and return when the display is available again.
 
 ### Applications
 
-Add applications that Minimemizer should ignore. Exclusions are stored using the application's `.exe` path.
+Add applications that Minimemizer should ignore, and manage default zone rules for specific applications. Exclusions and zone rules are stored using the application's `.exe` path. The thumbnail `⋯` menu can also move all currently minimized windows from one application or make the current zone its persistent default.
 
 ### About
 
-Displays the Minimemizer version and the architecture of both the application build and the Windows system. Version 0.5.8 is available for ARM64 and x64.
+Displays the Minimemizer version and the architecture of both the application build and the Windows system. Version 0.6.0 is available for ARM64 and x64.
 
 ## Everyday use
 
 - A thumbnail is created automatically when an application is minimized.
 - Thumbnail windows are excluded from Windows Task View and Alt+Tab.
 - The thumbnail is removed when the application is restored or closed.
+- Hover over a thumbnail and select `⋯` to move all current thumbnails from the same application or make the current zone its default.
 - Right-click a thumbnail to open the application's classic Windows menu when the option is enabled.
+- Starting another copy prompts before closing the running instance and replacing it with the new one.
 - Exit Minimemizer through the system tray icon. If it becomes unresponsive, it can be closed using Task Manager.
 
 ## Known limitations
