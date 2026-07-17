@@ -70,6 +70,7 @@ internal static class Localizer
         ["Tilføj program…"] = "Add application…",
         ["Fjern valgte"] = "Remove selected",
         ["Annuller"] = "Cancel",
+        ["Anvend"] = "Apply",
         ["Gem"] = "Save",
         ["Øverst til venstre"] = "Top left",
         ["Øverst til højre"] = "Top right",

@@ -86,8 +86,9 @@ public sealed class SettingsWindow : Window
         var footer = new Border { Tag = "footer", Padding = new Thickness(20, 12, 28, 12) };
         var footerButtons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         var cancel = MakeButton(T("Annuller"), false); cancel.Click += (_, _) => Close();
+        var apply = MakeButton(T("Anvend"), false); apply.Margin = new Thickness(8, 0, 0, 0); apply.Click += Apply;
         var save = MakeButton(T("Gem"), true); save.Margin = new Thickness(8, 0, 0, 0); save.Click += Save;
-        footerButtons.Children.Add(cancel); footerButtons.Children.Add(save); footer.Child = footerButtons;
+        footerButtons.Children.Add(cancel); footerButtons.Children.Add(apply); footerButtons.Children.Add(save); footer.Child = footerButtons;
         Grid.SetColumn(footer, 1); Grid.SetRow(footer, 1); root.Children.Add(footer);
         return root;
     }
@@ -179,7 +180,7 @@ public sealed class SettingsWindow : Window
     {
         var panel = PagePanel();
         var assemblyVersion = Assembly.GetExecutingAssembly().GetName().Version;
-        var version = assemblyVersion is null ? "0.5.6" : $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
+        var version = assemblyVersion is null ? "0.5.8" : $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
         panel.Children.Add(FluentCard.Create(T("Version"), T("Den installerede version af Minimemizer."), ValueText(version)));
         panel.Children.Add(FluentCard.Create(T("Arkitektur"), T("Den processorarkitektur denne udgave er bygget til."), ValueText(ArchitectureName(RuntimeInformation.ProcessArchitecture))));
         panel.Children.Add(FluentCard.Create(T("System"), T("Den Windows-arkitektur programmet kører på."), ValueText(ArchitectureName(RuntimeInformation.OSArchitecture))));
@@ -239,13 +240,23 @@ public sealed class SettingsWindow : Window
 
     private void RefreshExclusions() { _exclusions.ItemsSource = null; _exclusions.ItemsSource = _draft.ExcludedPaths.Order(StringComparer.OrdinalIgnoreCase).ToArray(); }
 
-    private void Save(object sender, RoutedEventArgs e)
+    private void Apply(object sender, RoutedEventArgs e) => PersistChanges(closeAfterSave: false);
+
+    private void Save(object sender, RoutedEventArgs e) => PersistChanges(closeAfterSave: true);
+
+    private void PersistChanges(bool closeAfterSave)
     {
         _draft.ThumbnailWidth = Math.Clamp(_draft.ThumbnailWidth, 100, 800); _draft.ThumbnailHeight = Math.Clamp(_draft.ThumbnailHeight, 60, 600);
         _draft.Gap = Math.Clamp(_draft.Gap, 0, 100); _draft.EdgeMargin = Math.Clamp(_draft.EdgeMargin, 0, 200);
-        var target = _store.Current;
-        foreach (var property in typeof(AppSettings).GetProperties().Where(p => p.CanRead && p.CanWrite)) property.SetValue(target, property.GetValue(_draft));
-        try { _store.Save(); _manager.Refresh(); LanguageChanged?.Invoke(this, EventArgs.Empty); Close(); }
+        try
+        {
+            var target = _store.Current;
+            foreach (var property in typeof(AppSettings).GetProperties().Where(p => p.CanRead && p.CanWrite)) property.SetValue(target, property.GetValue(_draft));
+            _store.Save();
+            _manager.Refresh();
+            LanguageChanged?.Invoke(this, EventArgs.Empty);
+            if (closeAfterSave) Close();
+        }
         catch (Exception ex) { MessageBox.Show(this, $"{T("Indstillingerne kunne ikke gemmes:")}\n{ex.Message}", "Minimemizer", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 

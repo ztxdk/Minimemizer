@@ -43,7 +43,7 @@ The self-contained builds are larger because they include the .NET and WPF runti
 
 ## Settings
 
-The settings window follows the Windows light or dark theme. The interface supports English and Danish, with English as the default language. Changes are applied when you select **Save**. **Cancel** closes the window without saving.
+The settings window follows the Windows light or dark theme. The interface supports English and Danish, with English as the default language. **Apply** saves and previews changes without closing the settings window, while **Save** saves and closes it. **Cancel** closes the window without saving changes made since the last apply.
 
 ### General
 
@@ -79,7 +79,7 @@ Add applications that Minimemizer should ignore. Exclusions are stored using the
 
 ### About
 
-Displays the Minimemizer version and the architecture of both the application build and the Windows system. Version 0.5.7 is available for ARM64 and x64.
+Displays the Minimemizer version and the architecture of both the application build and the Windows system. Version 0.5.8 is available for ARM64 and x64.
 
 ## Everyday use
 
