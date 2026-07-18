@@ -7,7 +7,6 @@ using Forms = System.Windows.Forms;
 using Application = System.Windows.Application;
 using DrawingPoint = System.Drawing.Point;
 using Button = System.Windows.Controls.Button;
-using MessageBox = System.Windows.MessageBox;
 
 namespace Minimemizer;
 
@@ -178,13 +177,31 @@ public sealed class WindowManager : IDisposable
                 Window = window,
                 Zone = ThumbnailZones.Resolve(GetRequestedZone(window), settings, screens)
             })
-            .GroupBy(item => item.Zone);
+            .GroupBy(item => item.Zone)
+            .Select(group => (Zone: group.Key, Windows: group.Select(item => item.Window).Reverse().ToArray()))
+            .ToArray();
 
         foreach (var group in groups)
-            LayoutZone(group.Key, group.Select(item => item.Window).Reverse().ToArray(), settings, screens);
+        {
+            var hasOppositeZone = groups.Any(other => IsOppositeAlongFlow(group.Zone, other.Zone, settings.Flow));
+            LayoutZone(group.Zone, group.Windows, settings, screens, useFullLength: !hasOppositeZone);
+        }
     }
 
-    private static void LayoutZone(ThumbnailZone zone, IReadOnlyList<ThumbnailWindow> windows, AppSettings settings, IReadOnlyList<Forms.Screen> screens)
+    private static bool IsOppositeAlongFlow(ThumbnailZone zone, ThumbnailZone other, ThumbnailFlow flow)
+    {
+        if (zone == other || !string.Equals(zone.ScreenDeviceName, other.ScreenDeviceName, StringComparison.OrdinalIgnoreCase)) return false;
+        var zoneRight = zone.Corner is ScreenCorner.TopRight or ScreenCorner.BottomRight;
+        var otherRight = other.Corner is ScreenCorner.TopRight or ScreenCorner.BottomRight;
+        var zoneBottom = zone.Corner is ScreenCorner.BottomLeft or ScreenCorner.BottomRight;
+        var otherBottom = other.Corner is ScreenCorner.BottomLeft or ScreenCorner.BottomRight;
+        return flow == ThumbnailFlow.Vertical
+            ? zoneRight == otherRight && zoneBottom != otherBottom
+            : zoneBottom == otherBottom && zoneRight != otherRight;
+    }
+
+    private static void LayoutZone(ThumbnailZone zone, IReadOnlyList<ThumbnailWindow> windows, AppSettings settings,
+        IReadOnlyList<Forms.Screen> screens, bool useFullLength)
     {
         var area = ThumbnailZones.FindScreen(zone, screens).WorkingArea;
         var items = windows
@@ -195,8 +212,10 @@ public sealed class WindowManager : IDisposable
             })
             .ToArray();
         var vertical = settings.Flow == ThumbnailFlow.Vertical;
-        var availableWidth = Math.Max(1, area.Width / 2 - 2 * settings.EdgeMargin);
-        var availableHeight = Math.Max(1, area.Height / 2 - 2 * settings.EdgeMargin);
+        var zoneWidth = vertical || !useFullLength ? area.Width / 2 : area.Width;
+        var zoneHeight = !vertical || !useFullLength ? area.Height / 2 : area.Height;
+        var availableWidth = Math.Max(1, zoneWidth - 2 * settings.EdgeMargin);
+        var availableHeight = Math.Max(1, zoneHeight - 2 * settings.EdgeMargin);
         var fromRight = zone.Corner is ScreenCorner.TopRight or ScreenCorner.BottomRight;
         var fromBottom = zone.Corner is ScreenCorner.BottomLeft or ScreenCorner.BottomRight;
 
@@ -204,7 +223,8 @@ public sealed class WindowManager : IDisposable
         {
             (ThumbnailWindow Window, (int Width, int Height) Size)[][] bestColumns = [];
             var bestScale = 0d;
-            for (var rowsPerColumn = items.Length; rowsPerColumn >= 1; rowsPerColumn--)
+            var minimumRows = settings.WrapZoneLayout ? 1 : items.Length;
+            for (var rowsPerColumn = items.Length; rowsPerColumn >= minimumRows; rowsPerColumn--)
             {
                 var columns = items.Chunk(rowsPerColumn).Select(chunk => chunk.ToArray()).ToArray();
                 var naturalWidth = columns.Sum(column => column.Max(item => item.Size.Width)) + settings.Gap * Math.Max(0, columns.Length - 1);
@@ -238,7 +258,8 @@ public sealed class WindowManager : IDisposable
 
         (ThumbnailWindow Window, (int Width, int Height) Size)[][] bestRows = [];
         var bestRowScale = 0d;
-        for (var columnsPerRow = items.Length; columnsPerRow >= 1; columnsPerRow--)
+        var minimumColumns = settings.WrapZoneLayout ? 1 : items.Length;
+        for (var columnsPerRow = items.Length; columnsPerRow >= minimumColumns; columnsPerRow--)
         {
             var rows = items.Chunk(columnsPerRow).Select(chunk => chunk.ToArray()).ToArray();
             var naturalWidth = rows.Max(row => row.Sum(item => item.Size.Width) + settings.Gap * Math.Max(0, row.Length - 1));
@@ -462,7 +483,7 @@ public sealed class WindowManager : IDisposable
         {
             _store.Current.ProgramZoneRules = previous;
             var message = Localizer.T(_store.Current.Language, "Indstillingerne kunne ikke gemmes:");
-            MessageBox.Show($"{message}\n{ex.Message}", "Minimemizer", MessageBoxButton.OK, MessageBoxImage.Error);
+            ThemedDialogWindow.ShowError(null, message, ex.Message);
         }
     }
 

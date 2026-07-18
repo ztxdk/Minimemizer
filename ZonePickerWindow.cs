@@ -12,7 +12,6 @@ using Color = System.Windows.Media.Color;
 using Cursors = System.Windows.Input.Cursors;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
 using Point = System.Windows.Point;
-using MessageBox = System.Windows.MessageBox;
 
 namespace Minimemizer;
 
@@ -163,8 +162,7 @@ internal sealed class ZonePickerWindow : Window
             try { _selected(new ThumbnailZone(screen.DeviceName, corner)); }
             catch (Exception ex)
             {
-                MessageBox.Show($"{Localizer.T(language, "Zonen kunne ikke ændres:")}\n{ex.Message}", "Minimemizer",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                ThemedDialogWindow.ShowError(null, Localizer.T(language, "Zonen kunne ikke ændres:"), ex.Message);
             }
         };
         Grid.SetRow(button, row);
@@ -215,8 +213,7 @@ internal sealed class ZonePickerWindow : Window
             catch (Exception ex)
             {
                 _openPicker = null;
-                MessageBox.Show($"{Localizer.T(language, "Zonevælgeren kunne ikke åbnes:")}\n{ex.Message}", "Minimemizer",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                ThemedDialogWindow.ShowError(null, Localizer.T(language, "Zonevælgeren kunne ikke åbnes:"), ex.Message);
             }
         });
     }

@@ -140,8 +140,7 @@ internal static class InstallationManager
         }
         catch (Exception ex)
         {
-            System.Windows.MessageBox.Show($"Minimemizer maintenance failed:\n{ex.Message}", "Minimemizer",
-                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            ThemedDialogWindow.ShowError(null, "Minimemizer maintenance failed", ex.Message);
         }
         return true;
     }

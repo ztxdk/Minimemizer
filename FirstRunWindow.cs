@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Interop;
 using Button = System.Windows.Controls.Button;
 using CheckBox = System.Windows.Controls.CheckBox;
 using Control = System.Windows.Controls.Control;
@@ -31,6 +32,7 @@ internal sealed class FirstRunWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Background = new SolidColorBrush(AppTheme.IsDarkModeEnabled() ? MediaColor.FromRgb(38, 38, 38) : MediaColor.FromRgb(249, 249, 249));
         Foreground = new SolidColorBrush(AppTheme.IsDarkModeEnabled() ? Colors.White : MediaColor.FromRgb(24, 24, 24));
+        SourceInitialized += (_, _) => ApplyNativeAppearance();
 
         _currentUser.Content = T("Installér kun for mig");
         _allUsers.Content = T("Installér for alle brugere (kræver administrator)");
@@ -58,5 +60,14 @@ internal sealed class FirstRunWindow : Window
         };
         buttons.Children.Add(portable); buttons.Children.Add(install); content.Children.Add(buttons);
         Content = content;
+    }
+
+    private void ApplyNativeAppearance()
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        var dark = AppTheme.IsDarkModeEnabled() ? 1 : 0;
+        NativeMethods.DwmSetWindowAttribute(handle, 20, ref dark, sizeof(int));
+        var corner = 2;
+        NativeMethods.DwmSetWindowAttribute(handle, 33, ref corner, sizeof(int));
     }
 }

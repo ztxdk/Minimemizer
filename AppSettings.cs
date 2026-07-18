@@ -26,6 +26,7 @@ public sealed class AppSettings
     public string ScreenDeviceName { get; set; } = "";
     public ScreenCorner Corner { get; set; } = ScreenCorner.BottomRight;
     public ThumbnailFlow Flow { get; set; } = ThumbnailFlow.Horizontal;
+    public bool WrapZoneLayout { get; set; }
     public bool AutoStart { get; set; }
     public bool AutomaticUpdateChecks { get; set; } = true;
     public bool ShowProgramIcon { get; set; } = true;

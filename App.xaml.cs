@@ -7,7 +7,6 @@ using System.Windows;
 using Microsoft.Win32;
 using Forms = System.Windows.Forms;
 using Application = System.Windows.Application;
-using MessageBox = System.Windows.MessageBox;
 
 namespace Minimemizer;
 
@@ -63,7 +62,8 @@ public partial class App : Application
                     Shutdown();
                     return;
                 }
-                MessageBox.Show(Localizer.T(_store.Current.Language, "Installationen kunne ikke startes."), "Minimemizer", MessageBoxButton.OK, MessageBoxImage.Error);
+                ThemedDialogWindow.ShowError(null, Localizer.T(_store.Current.Language, "Installation"),
+                    Localizer.T(_store.Current.Language, "Installationen kunne ikke startes."));
             }
         }
         StartExitListener();
@@ -146,9 +146,13 @@ public partial class App : Application
         var installation = InstallationManager.DetectCurrent();
         if (!installation.IsInstalled) { Shutdown(); return; }
         var language = _store.Current.Language;
-        if (MessageBox.Show(Localizer.T(language, "Vil du afinstallere Minimemizer?"), "Minimemizer", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (!ThemedDialogWindow.Confirm(null, Localizer.T(language, "Afinstallér Minimemizer"),
+                Localizer.T(language, "Vil du afinstallere Minimemizer?"), Localizer.T(language, "Afinstallér"),
+                Localizer.T(language, "Annuller")))
         { Shutdown(); return; }
-        var delete = MessageBox.Show(Localizer.T(language, "Vil du også slette dine personlige indstillinger?"), "Minimemizer", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+        var delete = ThemedDialogWindow.Confirm(null, Localizer.T(language, "Personlige indstillinger"),
+            Localizer.T(language, "Vil du også slette dine personlige indstillinger?"),
+            Localizer.T(language, "Slet indstillinger"), Localizer.T(language, "Bevar indstillinger"));
         InstallationManager.BeginUninstall(installation, delete);
         Shutdown();
     }
@@ -170,15 +174,14 @@ public partial class App : Application
         if (createdNew && !HasOtherMinimemizerProcesses()) return true;
 
         var language = _store?.Current.Language ?? AppLanguage.English;
-        var message = $"{Localizer.T(language, "Minimemizer kører allerede.")}\n\n{Localizer.T(language, "Vil du lukke den kørende udgave og starte denne?")}";
-        if (MessageBox.Show(message, "Minimemizer", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+        if (!ThemedDialogWindow.ConfirmSingleInstance(language))
             return false;
 
         if (createdNew)
         {
             CloseLegacyInstances();
             if (!HasOtherMinimemizerProcesses()) return true;
-            MessageBox.Show(Localizer.T(language, "Den kørende udgave kunne ikke lukkes."), "Minimemizer", MessageBoxButton.OK, MessageBoxImage.Error);
+            ThemedDialogWindow.ShowSingleInstanceError(language);
             return false;
         }
 
@@ -187,7 +190,7 @@ public partial class App : Application
         CloseLegacyInstances();
         if (TryAcquireInstanceMutex(TimeSpan.FromSeconds(5))) return true;
 
-        MessageBox.Show(Localizer.T(language, "Den kørende udgave kunne ikke lukkes."), "Minimemizer", MessageBoxButton.OK, MessageBoxImage.Error);
+        ThemedDialogWindow.ShowSingleInstanceError(language);
         return false;
     }
 

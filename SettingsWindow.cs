@@ -20,7 +20,6 @@ using ScrollBar = System.Windows.Controls.Primitives.ScrollBar;
 using ListBox = System.Windows.Controls.ListBox;
 using Panel = System.Windows.Controls.Panel;
 using Orientation = System.Windows.Controls.Orientation;
-using MessageBox = System.Windows.MessageBox;
 using Control = System.Windows.Controls.Control;
 using SystemColors = System.Windows.SystemColors;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
@@ -182,6 +181,7 @@ public sealed class SettingsWindow : Window
         panel.Children.Add(FluentCard.Create(T("Skærm"), T("Skærmen hvor thumbnails skal placeres."), Choice(screens, selectedScreen, value => _draft.ScreenDeviceName = value)));
         panel.Children.Add(FluentCard.Create(T("Hjørne"), T("Startpunktet for rækken af thumbnails."), Choice(CornerChoices(), _draft.Corner, value => _draft.Corner = value)));
         panel.Children.Add(FluentCard.Create(T("Retning"), T("Placér thumbnails vandret eller lodret."), Choice(new[] { (ThumbnailFlow.Horizontal, T("Vandret")), (ThumbnailFlow.Vertical, T("Lodret")) }, _draft.Flow, value => _draft.Flow = value)));
+        panel.Children.Add(FluentCard.Create(T("Ombryd zone"), T("Brug flere rækker eller kolonner, før thumbnails skaleres ned."), Toggle(_draft.WrapZoneLayout, value => _draft.WrapZoneLayout = value)));
         panel.Children.Add(FluentCard.Create(T("Afstand"), T("Afstand mellem thumbnails i pixels."), NumberBox(_draft.Gap, value => _draft.Gap = value)));
         panel.Children.Add(FluentCard.Create(T("Kantafstand"), T("Afstand fra skærmens kant i pixels."), NumberBox(_draft.EdgeMargin, value => _draft.EdgeMargin = value)));
         return Scroll(panel);
@@ -244,7 +244,9 @@ public sealed class SettingsWindow : Window
             installUpdate.Margin = new Thickness(8, 0, 0, 0);
             installUpdate.Click += async (_, _) =>
             {
-                if (MessageBox.Show(this, T("Download og installér opdateringen nu? Minimemizer genstartes."), "Minimemizer", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                if (!ThemedDialogWindow.Confirm(this, T("Installér opdatering"),
+                        T("Download og installér opdateringen nu? Minimemizer genstartes."),
+                        T("Installér opdatering"), T("Annuller"))) return;
                 PersistChanges(closeAfterSave: false);
                 if (await _updates.DownloadAndStartUpdateAsync()) Application.Current.Shutdown();
             };
@@ -286,15 +288,17 @@ public sealed class SettingsWindow : Window
         if (dialog.ShowDialog() != true || dialog.Choice is not { } choice || choice.Scope == InstallationScope.Portable) return;
         PersistChanges(closeAfterSave: false);
         if (InstallationManager.BeginInstall(choice.Scope, choice.StartMenuShortcut, choice.DesktopShortcut)) Application.Current.Shutdown();
-        else MessageBox.Show(this, T("Installationen kunne ikke startes."), "Minimemizer", MessageBoxButton.OK, MessageBoxImage.Error);
+        else ThemedDialogWindow.ShowError(this, T("Installation"), T("Installationen kunne ikke startes."));
     }
 
     private void RequestUninstall(InstallationInfo installation)
     {
-        if (MessageBox.Show(this, T("Vil du afinstallere Minimemizer?"), "Minimemizer", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-        var delete = MessageBox.Show(this, T("Vil du også slette dine personlige indstillinger?"), "Minimemizer", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+        if (!ThemedDialogWindow.Confirm(this, T("Afinstallér Minimemizer"), T("Vil du afinstallere Minimemizer?"),
+                T("Afinstallér"), T("Annuller"))) return;
+        var delete = ThemedDialogWindow.Confirm(this, T("Personlige indstillinger"),
+            T("Vil du også slette dine personlige indstillinger?"), T("Slet indstillinger"), T("Bevar indstillinger"));
         if (InstallationManager.BeginUninstall(installation, delete)) Application.Current.Shutdown();
-        else MessageBox.Show(this, T("Afinstallationen kunne ikke startes."), "Minimemizer", MessageBoxButton.OK, MessageBoxImage.Error);
+        else ThemedDialogWindow.ShowError(this, T("Afinstallér Minimemizer"), T("Afinstallationen kunne ikke startes."));
     }
 
     private static TextBlock ValueText(string value) => new() { Text = value, FontSize = 15, FontWeight = FontWeights.SemiBold, MinWidth = 110, TextAlignment = TextAlignment.Right };
@@ -422,7 +426,7 @@ public sealed class SettingsWindow : Window
             LanguageChanged?.Invoke(this, EventArgs.Empty);
             if (closeAfterSave) Close();
         }
-        catch (Exception ex) { MessageBox.Show(this, $"{T("Indstillingerne kunne ikke gemmes:")}\n{ex.Message}", "Minimemizer", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (Exception ex) { ThemedDialogWindow.ShowError(this, T("Indstillingerne kunne ikke gemmes:"), ex.Message); }
     }
 
     private void SystemThemeChanged(object sender, UserPreferenceChangedEventArgs e) => Dispatcher.BeginInvoke(ApplySystemTheme);

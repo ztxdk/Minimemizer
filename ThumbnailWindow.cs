@@ -227,7 +227,7 @@ internal sealed class ThumbnailWindow : Window
             var scaled = _lastPreferredHeight > 0
                 ? (int)Math.Round(TitleBarHeightPixels * (double)height / _lastPreferredHeight)
                 : TitleBarHeightPixels;
-            _effectiveTitleBarHeightPixels = Math.Min(Math.Max(1, height - 1), Math.Max(20, scaled));
+            _effectiveTitleBarHeightPixels = Math.Min(Math.Max(1, height - 1), Math.Max(1, scaled));
         }
         else _effectiveTitleBarHeightPixels = 0;
         _pixelX = x;
@@ -436,7 +436,10 @@ internal sealed class ThumbnailWindow : Window
         var dpi = VisualTreeHelper.GetDpi(this);
         var topPixels = _titleMode == ThumbnailTitleMode.AlwaysAbove ? _effectiveTitleBarHeightPixels : 0;
         var topDip = topPixels / Math.Max(0.1, dpi.DpiScaleY);
+        var titleScale = topPixels / (double)TitleBarHeightPixels;
         _aboveTitleBorder.Height = topPixels / Math.Max(0.1, dpi.DpiScaleY);
+        _aboveTitleBorder.Padding = new Thickness(10 * titleScale, 0, 10 * titleScale, 0);
+        _aboveTitleText.FontSize = Math.Max(1, 13 * titleScale);
         _frameBorder.Margin = new Thickness(0, topDip, 0, 0);
         _zoneMenuButton.Margin = new Thickness(8, topDip + 8, 8, 8);
         _insideTitleBorder.HorizontalAlignment = _showIcon &&
@@ -463,6 +466,9 @@ internal sealed class ThumbnailWindow : Window
     internal void SetThumbnailOpacity(int opacityPercent)
     {
         _opacityPercent = Math.Clamp(opacityPercent, 20, 100);
+        var opacity = _opacityPercent / 100d;
+        _insideTitleBorder.Opacity = opacity;
+        _aboveTitleBorder.Opacity = opacity;
         UpdateThumbnail();
         _iconBadge?.SetOpacity(_opacityPercent);
     }

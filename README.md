@@ -70,11 +70,14 @@ A live preview shows how appearance changes will look.
 
 - Select the default display and corner for thumbnails without a zone rule.
 - Arrange thumbnails horizontally or vertically.
+- Keep one row/column or enable wrapping into additional rows/columns.
 - Adjust the spacing between thumbnails and the display edge.
 - Drag a thumbnail to any corner on any connected display to move that window into the highlighted zone.
 - Move an individual thumbnail only by dragging it. After dragging it away from its default corner, use `⋯` to pin other open thumbnails from the same application there or make that corner the application's default.
 
-Each display has four independent corner zones. If a single row or column does not fit, the zone wraps thumbnails into additional rows or columns before scaling them down.
+Each display has four independent corner zones. By default, a zone keeps one row or column and scales the complete thumbnails, including title bars, when necessary. Optional zone wrapping can use additional rows or columns before scaling.
+
+A zone can use the full length of its display edge when the opposite corner on that edge is empty. For example, a top-right vertical zone can extend to the bottom of the display until the bottom-right zone contains thumbnails.
 Dragging changes only the selected window and is remembered while that window exists. If a configured display is disconnected, its thumbnails temporarily fall back to the default display and return when the display is available again.
 
 ### Applications
@@ -83,7 +86,7 @@ Add applications that Minimemizer should ignore, and manage default zone rules f
 
 ### About
 
-Displays the version, architecture, update status, and installation mode. Version 0.7.1 is available for ARM64 and x64. This page can check for updates, install a verified update, install a portable copy, or uninstall an installed copy.
+Displays the version, architecture, update status, and installation mode. Version 0.7.2 is available for ARM64 and x64. This page can check for updates, install a verified update, install a portable copy, or uninstall an installed copy.
 
 ## Installation, updates, and removal
 
