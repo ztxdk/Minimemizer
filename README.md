@@ -83,7 +83,7 @@ Add applications that Minimemizer should ignore, and manage default zone rules f
 
 ### About
 
-Displays the version, architecture, update status, and installation mode. Version 0.7.0 is available for ARM64 and x64. This page can check for updates, install a verified update, install a portable copy, or uninstall an installed copy.
+Displays the version, architecture, update status, and installation mode. Version 0.7.1 is available for ARM64 and x64. This page can check for updates, install a verified update, install a portable copy, or uninstall an installed copy.
 
 ## Installation, updates, and removal
 
