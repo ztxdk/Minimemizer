@@ -31,11 +31,15 @@ internal static class FluentMenu
         var hover = dark ? "#FF3A3A3A" : "#FFE8E8E8";
         var line = dark ? "#FF474747" : "#FFD8D8D8";
 
-        var menu = new DismissibleContextMenu { StaysOpen = false };
+        var menu = new DismissibleContextMenu
+        {
+            StaysOpen = false,
+            MaxHeight = Math.Max(160, SystemParameters.WorkArea.Height - 24)
+        };
         menu.Style = (Style)XamlReader.Parse($$$"""
         <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="{x:Type ContextMenu}">
           <Setter Property="Background" Value="{{{surface}}}"/><Setter Property="Foreground" Value="{{{foreground}}}"/><Setter Property="BorderBrush" Value="{{{border}}}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Padding" Value="4"/>
-          <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="{x:Type ContextMenu}"><Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}"><StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/></Border></ControlTemplate></Setter.Value></Setter>
+          <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="{x:Type ContextMenu}"><Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="{TemplateBinding MaxHeight}"><StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/></ScrollViewer></Border></ControlTemplate></Setter.Value></Setter>
         </Style>
         """);
         menu.Resources[typeof(MenuItem)] = XamlReader.Parse($$$"""

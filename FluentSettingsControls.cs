@@ -32,6 +32,8 @@ internal sealed class ThumbnailPreview : Border
     private readonly Border _icon = new();
     private readonly Grid _canvas = new();
     private readonly Grid _thumbnailCanvas = new();
+    private readonly Border _insideTitle = new();
+    private readonly Border _aboveTitle = new();
 
     internal ThumbnailPreview()
     {
@@ -52,6 +54,42 @@ internal sealed class ThumbnailPreview : Border
         Grid.SetRow(body, 1); mock.Children.Add(body);
         _mockContent.Child = mock;
         _thumbnailCanvas.Children.Add(_mockContent);
+        _insideTitle.Child = new TextBlock
+        {
+            Text = "Pictures",
+            Foreground = Brushes.White,
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        _insideTitle.Background = new SolidColorBrush(Color.FromArgb(225, 35, 35, 35));
+        _insideTitle.BorderBrush = new SolidColorBrush(Color.FromRgb(85, 85, 85));
+        _insideTitle.BorderThickness = new Thickness(1);
+        _insideTitle.CornerRadius = new CornerRadius(5);
+        _insideTitle.Padding = new Thickness(7, 3, 7, 3);
+        _insideTitle.Margin = new Thickness(7);
+        _insideTitle.HorizontalAlignment = HorizontalAlignment.Left;
+        _insideTitle.VerticalAlignment = VerticalAlignment.Bottom;
+        _insideTitle.Visibility = Visibility.Collapsed;
+        _thumbnailCanvas.Children.Add(_insideTitle);
+
+        _aboveTitle.Child = new TextBlock
+        {
+            Text = "Pictures",
+            Foreground = Brushes.White,
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        _aboveTitle.Background = new SolidColorBrush(Color.FromRgb(38, 38, 38));
+        _aboveTitle.BorderBrush = new SolidColorBrush(Color.FromRgb(82, 82, 82));
+        _aboveTitle.BorderThickness = new Thickness(1, 1, 1, 0);
+        _aboveTitle.Padding = new Thickness(8, 0, 8, 0);
+        _aboveTitle.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _aboveTitle.VerticalAlignment = VerticalAlignment.Top;
+        _aboveTitle.Visibility = Visibility.Collapsed;
+        _thumbnailCanvas.Children.Add(_aboveTitle);
         _thumbnail.Child = _thumbnailCanvas;
 
         _icon.Width = _icon.Height = 34;
@@ -67,9 +105,11 @@ internal sealed class ThumbnailPreview : Border
     {
         const double maximumWidth = 390, maximumHeight = 195;
         var desiredWidth = settings.ThumbnailWidth;
-        var desiredHeight = settings.SizeMode == ThumbnailSizeMode.Adaptive
+        var previewHeight = settings.SizeMode == ThumbnailSizeMode.Adaptive
             ? Math.Min(settings.ThumbnailHeight, settings.ThumbnailWidth * .625)
             : settings.ThumbnailHeight;
+        var titleBarHeight = settings.TitleMode == ThumbnailTitleMode.AlwaysAbove ? 28d : 0d;
+        var desiredHeight = previewHeight + titleBarHeight;
         var scale = Math.Min(1d, Math.Min(maximumWidth / desiredWidth, maximumHeight / desiredHeight));
         _thumbnail.Width = Math.Max(40, desiredWidth * scale);
         _thumbnail.Height = Math.Max(30, desiredHeight * scale);
@@ -81,8 +121,18 @@ internal sealed class ThumbnailPreview : Border
         _thumbnail.CornerRadius = settings.FrameStyle == ThumbnailFrameStyle.Rounded ? new CornerRadius(12) : new CornerRadius(0);
         _thumbnail.ClipToBounds = true;
 
+        var scaledTitleHeight = titleBarHeight * scale;
+        _aboveTitle.Visibility = settings.TitleMode == ThumbnailTitleMode.AlwaysAbove ? Visibility.Visible : Visibility.Collapsed;
+        _aboveTitle.Height = scaledTitleHeight;
+        _aboveTitle.CornerRadius = settings.FrameStyle == ThumbnailFrameStyle.Rounded ? new CornerRadius(9, 9, 0, 0) : new CornerRadius(0);
+        _insideTitle.Visibility = settings.TitleMode == ThumbnailTitleMode.AlwaysInside ? Visibility.Visible : Visibility.Collapsed;
+        _insideTitle.HorizontalAlignment = settings.ShowProgramIcon && settings.IconPosition is ThumbnailIconPosition.BottomLeft or ThumbnailIconPosition.BottomCenter
+            ? HorizontalAlignment.Right
+            : HorizontalAlignment.Left;
+        _mockContent.Margin = new Thickness(0, scaledTitleHeight, 0, 0);
+
         var innerWidth = Math.Max(1, _thumbnail.Width - _thumbnail.BorderThickness.Left * 2);
-        var innerHeight = Math.Max(1, _thumbnail.Height - _thumbnail.BorderThickness.Top * 2);
+        var innerHeight = Math.Max(1, _thumbnail.Height - scaledTitleHeight - _thumbnail.BorderThickness.Top * 2);
         if (settings.SizeMode == ThumbnailSizeMode.Uniform && settings.UniformContent == UniformContentMode.Contain)
         {
             const double sourceAspect = 1.6;
@@ -101,6 +151,9 @@ internal sealed class ThumbnailPreview : Border
         _icon.Visibility = settings.ShowProgramIcon ? Visibility.Visible : Visibility.Collapsed;
         _icon.HorizontalAlignment = settings.IconPosition is ThumbnailIconPosition.TopLeft or ThumbnailIconPosition.BottomLeft ? HorizontalAlignment.Left : settings.IconPosition is ThumbnailIconPosition.TopCenter or ThumbnailIconPosition.BottomCenter ? HorizontalAlignment.Center : HorizontalAlignment.Right;
         _icon.VerticalAlignment = settings.IconPosition is ThumbnailIconPosition.BottomLeft or ThumbnailIconPosition.BottomCenter or ThumbnailIconPosition.BottomRight ? VerticalAlignment.Bottom : VerticalAlignment.Top;
-        _icon.Margin = new Thickness(7);
+        var iconAtTop = settings.IconPosition is ThumbnailIconPosition.TopLeft or ThumbnailIconPosition.TopCenter or ThumbnailIconPosition.TopRight;
+        _icon.Margin = iconAtTop && scaledTitleHeight > 0
+            ? new Thickness(7, 7 + scaledTitleHeight, 7, 7)
+            : new Thickness(7);
     }
 }

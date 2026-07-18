@@ -154,6 +154,8 @@ public sealed class WindowManager : IDisposable
             var exists = NativeMethods.IsWindow(pair.Key);
             if (!exists || !NativeMethods.IsIconic(pair.Key) || !IsEligible(pair.Key) || !pair.Value.MatchesSource(pair.Key))
                 changed |= Remove(pair.Key, relayout: false, discardOverride: !exists || !pair.Value.MatchesSource(pair.Key));
+            else
+                pair.Value.RefreshTitle();
         }
         NativeMethods.EnumWindows((hwnd, _) =>
         {
@@ -186,44 +188,84 @@ public sealed class WindowManager : IDisposable
     {
         var area = ThumbnailZones.FindScreen(zone, screens).WorkingArea;
         var items = windows
-            .Select(window => (Window: window, Size: window.GetPreferredSize(settings.ThumbnailWidth, settings.ThumbnailHeight, settings.SizeMode)))
+            .Select(window =>
+            {
+                ApplySettings(window, settings);
+                return (Window: window, Size: window.GetPreferredSize(settings.ThumbnailWidth, settings.ThumbnailHeight, settings.SizeMode));
+            })
             .ToArray();
         var vertical = settings.Flow == ThumbnailFlow.Vertical;
-        var zoneLength = (vertical ? area.Height : area.Width) / 2;
-        var zoneCrossLength = (vertical ? area.Width : area.Height) / 2;
-        var availableLength = Math.Max(1, zoneLength - 2 * settings.EdgeMargin);
-        var availableCrossLength = Math.Max(1, zoneCrossLength - 2 * settings.EdgeMargin);
-        var naturalLength = items.Sum(item => vertical ? item.Size.Height : item.Size.Width) + settings.Gap * Math.Max(0, items.Length - 1);
-        var naturalCrossLength = items.Length == 0 ? 0 : items.Max(item => vertical ? item.Size.Width : item.Size.Height);
-        var lengthScale = naturalLength > 0 ? (double)availableLength / naturalLength : 1d;
-        var crossScale = naturalCrossLength > 0 ? (double)availableCrossLength / naturalCrossLength : 1d;
-        var scale = Math.Min(1d, Math.Max(0.05d, Math.Min(lengthScale, crossScale)));
-        var gap = (int)Math.Round(settings.Gap * scale);
+        var availableWidth = Math.Max(1, area.Width / 2 - 2 * settings.EdgeMargin);
+        var availableHeight = Math.Max(1, area.Height / 2 - 2 * settings.EdgeMargin);
         var fromRight = zone.Corner is ScreenCorner.TopRight or ScreenCorner.BottomRight;
         var fromBottom = zone.Corner is ScreenCorner.BottomLeft or ScreenCorner.BottomRight;
-        var cursor = vertical
-            ? (fromBottom ? area.Bottom - settings.EdgeMargin : area.Top + settings.EdgeMargin)
-            : (fromRight ? area.Right - settings.EdgeMargin : area.Left + settings.EdgeMargin);
 
-        foreach (var item in items)
+        if (vertical)
         {
-            var width = Math.Max(1, (int)Math.Round(item.Size.Width * scale));
-            var height = Math.Max(1, (int)Math.Round(item.Size.Height * scale));
-            int x, y;
-            if (vertical)
+            (ThumbnailWindow Window, (int Width, int Height) Size)[][] bestColumns = [];
+            var bestScale = 0d;
+            for (var rowsPerColumn = items.Length; rowsPerColumn >= 1; rowsPerColumn--)
             {
-                y = fromBottom ? cursor - height : cursor;
-                x = fromRight ? area.Right - settings.EdgeMargin - width : area.Left + settings.EdgeMargin;
-                cursor += fromBottom ? -(height + gap) : height + gap;
+                var columns = items.Chunk(rowsPerColumn).Select(chunk => chunk.ToArray()).ToArray();
+                var naturalWidth = columns.Sum(column => column.Max(item => item.Size.Width)) + settings.Gap * Math.Max(0, columns.Length - 1);
+                var naturalHeight = columns.Max(column => column.Sum(item => item.Size.Height) + settings.Gap * Math.Max(0, column.Length - 1));
+                var candidateScale = Math.Min(1d, Math.Min((double)availableWidth / naturalWidth, (double)availableHeight / naturalHeight));
+                if (candidateScale <= bestScale) continue;
+                bestScale = candidateScale;
+                bestColumns = columns;
             }
-            else
+
+            var scale = Math.Max(0.05d, bestScale);
+            var gap = (int)Math.Round(settings.Gap * scale);
+            var columnCursor = fromRight ? area.Right - settings.EdgeMargin : area.Left + settings.EdgeMargin;
+            foreach (var column in bestColumns)
             {
-                x = fromRight ? cursor - width : cursor;
-                y = fromBottom ? area.Bottom - settings.EdgeMargin - height : area.Top + settings.EdgeMargin;
-                cursor += fromRight ? -(width + gap) : width + gap;
+                var columnWidth = column.Max(item => Math.Max(1, (int)Math.Round(item.Size.Width * scale)));
+                var rowCursor = fromBottom ? area.Bottom - settings.EdgeMargin : area.Top + settings.EdgeMargin;
+                foreach (var item in column)
+                {
+                    var width = Math.Max(1, (int)Math.Round(item.Size.Width * scale));
+                    var height = Math.Max(1, (int)Math.Round(item.Size.Height * scale));
+                    var x = fromRight ? columnCursor - width : columnCursor;
+                    var y = fromBottom ? rowCursor - height : rowCursor;
+                    item.Window.ApplyBounds(x, y, width, height);
+                    rowCursor += fromBottom ? -(height + gap) : height + gap;
+                }
+                columnCursor += fromRight ? -(columnWidth + gap) : columnWidth + gap;
             }
-            ApplySettings(item.Window, settings);
-            item.Window.ApplyBounds(x, y, width, height);
+            return;
+        }
+
+        (ThumbnailWindow Window, (int Width, int Height) Size)[][] bestRows = [];
+        var bestRowScale = 0d;
+        for (var columnsPerRow = items.Length; columnsPerRow >= 1; columnsPerRow--)
+        {
+            var rows = items.Chunk(columnsPerRow).Select(chunk => chunk.ToArray()).ToArray();
+            var naturalWidth = rows.Max(row => row.Sum(item => item.Size.Width) + settings.Gap * Math.Max(0, row.Length - 1));
+            var naturalHeight = rows.Sum(row => row.Max(item => item.Size.Height)) + settings.Gap * Math.Max(0, rows.Length - 1);
+            var candidateScale = Math.Min(1d, Math.Min((double)availableWidth / naturalWidth, (double)availableHeight / naturalHeight));
+            if (candidateScale <= bestRowScale) continue;
+            bestRowScale = candidateScale;
+            bestRows = rows;
+        }
+
+        var rowScale = Math.Max(0.05d, bestRowScale);
+        var rowGap = (int)Math.Round(settings.Gap * rowScale);
+        var outerCursor = fromBottom ? area.Bottom - settings.EdgeMargin : area.Top + settings.EdgeMargin;
+        foreach (var row in bestRows)
+        {
+            var rowHeight = row.Max(item => Math.Max(1, (int)Math.Round(item.Size.Height * rowScale)));
+            var innerCursor = fromRight ? area.Right - settings.EdgeMargin : area.Left + settings.EdgeMargin;
+            foreach (var item in row)
+            {
+                var width = Math.Max(1, (int)Math.Round(item.Size.Width * rowScale));
+                var height = Math.Max(1, (int)Math.Round(item.Size.Height * rowScale));
+                var x = fromRight ? innerCursor - width : innerCursor;
+                var y = fromBottom ? outerCursor - height : outerCursor;
+                item.Window.ApplyBounds(x, y, width, height);
+                innerCursor += fromRight ? -(width + rowGap) : width + rowGap;
+            }
+            outerCursor += fromBottom ? -(rowHeight + rowGap) : rowHeight + rowGap;
         }
     }
 
@@ -234,7 +276,7 @@ public sealed class WindowManager : IDisposable
         window.SetIconPosition(settings.IconPosition);
         window.SetThumbnailOpacity(settings.ThumbnailOpacity);
         window.SetContextMenuEnabled(settings.EnableThumbnailContextMenu);
-        window.SetTitleTooltipEnabled(settings.ShowTitleOnHover);
+        window.SetTitleMode(settings.TitleMode);
         window.SetIconVisibility(settings.ShowProgramIcon);
         window.SetRestoreOnSingleClick(settings.RestoreOnSingleClick);
     }
@@ -325,46 +367,71 @@ public sealed class WindowManager : IDisposable
         if (_disposed || !_thumbnails.ContainsKey(window.SourceHandle)) return;
         var language = _store.Current.Language;
         var currentZone = ThumbnailZones.Resolve(GetRequestedZone(window), _store.Current, Forms.Screen.AllScreens);
+        var rule = _store.Current.ProgramZoneRules.LastOrDefault(rule =>
+            string.Equals(rule.ExecutablePath, window.ExecutablePath, StringComparison.OrdinalIgnoreCase));
+        var defaultRequest = rule is null ? ThumbnailZones.Default(_store.Current) : ThumbnailZones.FromRule(rule);
+        var defaultZone = ThumbnailZones.Resolve(defaultRequest, _store.Current, Forms.Screen.AllScreens);
+        var hasIndividualOverride = _windowZones.TryGetValue(window.SourceHandle, out var windowOverride) &&
+                                    windowOverride.ProcessId == window.SourceProcessId &&
+                                    string.Equals(windowOverride.ExecutablePath, window.ExecutablePath, StringComparison.OrdinalIgnoreCase);
+        var manuallyMoved = hasIndividualOverride && currentZone != defaultZone;
+        var otherWindows = _thumbnails.Values.Where(candidate =>
+                !ReferenceEquals(candidate, window) &&
+                string.Equals(candidate.ExecutablePath, window.ExecutablePath, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
         var menu = FluentMenu.Create(AppTheme.IsDarkModeEnabled());
         menu.PlacementTarget = anchor;
         menu.Placement = PlacementMode.Bottom;
-        menu.Items.Add(new MenuItem { Header = Localizer.T(language, "Flyt til zone"), IsEnabled = false });
-        foreach (var screen in Forms.Screen.AllScreens)
+        var display = ThumbnailZones.DisplayLabel(language, currentZone.ScreenDeviceName, Forms.Screen.AllScreens);
+        var corner = ThumbnailZones.CornerLabel(language, currentZone.Corner);
+        menu.Items.Add(new MenuItem
         {
-            var display = ThumbnailZones.DisplayLabel(language, screen.DeviceName, Forms.Screen.AllScreens);
-            foreach (var corner in Enum.GetValues<ScreenCorner>())
+            Header = $"{window.ProgramName}  ·  {display}  ·  {corner}",
+            IsEnabled = false
+        });
+
+        if (manuallyMoved && otherWindows.Length > 0)
+        {
+            var pinOthers = new MenuItem
             {
-                var zone = new ThumbnailZone(screen.DeviceName, corner);
-                var cornerItem = new MenuItem
-                {
-                    Header = $"{display} · {ThumbnailZones.CornerLabel(language, corner)}",
-                    IsChecked = zone == currentZone
-                };
-                cornerItem.Click += (_, _) => { SetWindowZone(window, zone); Relayout(); };
-                menu.Items.Add(cornerItem);
-            }
+                Header = otherWindows.Length == 1
+                    ? Localizer.T(language, "Fastgør det andet åbne vindue her")
+                    : string.Format(Localizer.T(language, "Fastgør {0} andre åbne vinduer her"), otherWindows.Length)
+            };
+            pinOthers.Click += (_, _) =>
+            {
+                foreach (var candidate in otherWindows) SetWindowZone(candidate, currentZone);
+                Relayout();
+            };
+            menu.Items.Add(pinOthers);
         }
-        menu.Items.Add(new Separator());
+        else if (manuallyMoved)
+        {
+            menu.Items.Add(new MenuItem
+            {
+                Header = string.Format(Localizer.T(language, "Der er ingen andre åbne vinduer fra {0}"), window.ProgramName),
+                IsEnabled = false
+            });
+        }
+        else
+        {
+            menu.Items.Add(new MenuItem
+            {
+                Header = Localizer.T(language, "Træk først thumbnailen til et andet hjørne for at fastgøre andre vinduer"),
+                IsEnabled = false
+            });
+        }
 
-        var moveAll = new MenuItem
+        if (manuallyMoved)
         {
-            Header = string.Format(Localizer.T(language, "Flyt alle åbne fra {0} hertil"), window.ProgramName)
-        };
-        moveAll.Click += (_, _) =>
-        {
-            foreach (var candidate in _thumbnails.Values.Where(candidate =>
-                         string.Equals(candidate.ExecutablePath, window.ExecutablePath, StringComparison.OrdinalIgnoreCase)))
-                SetWindowZone(candidate, currentZone);
-            Relayout();
-        };
-        menu.Items.Add(moveAll);
-
-        var makeDefault = new MenuItem
-        {
-            Header = string.Format(Localizer.T(language, "Brug denne zone som standard for {0}"), window.ProgramName)
-        };
-        makeDefault.Click += (_, _) => SaveProgramRule(window, currentZone);
-        menu.Items.Add(makeDefault);
+            menu.Items.Add(new Separator());
+            var makeDefault = new MenuItem
+            {
+                Header = string.Format(Localizer.T(language, "Brug dette hjørne som standard for {0}"), window.ProgramName)
+            };
+            makeDefault.Click += (_, _) => SaveProgramRule(window, currentZone);
+            menu.Items.Add(makeDefault);
+        }
         menu.IsOpen = true;
     }
 

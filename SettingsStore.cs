@@ -14,7 +14,16 @@ public sealed class SettingsStore
     {
         try
         {
-            if (File.Exists(_path)) Current = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_path)) ?? new();
+            if (File.Exists(_path))
+            {
+                var json = File.ReadAllText(_path);
+                Current = JsonSerializer.Deserialize<AppSettings>(json) ?? new();
+                using var document = JsonDocument.Parse(json);
+                if (!document.RootElement.TryGetProperty(nameof(AppSettings.TitleMode), out _) &&
+                    document.RootElement.TryGetProperty("ShowTitleOnHover", out var legacyHover) &&
+                    legacyHover.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                    Current.TitleMode = legacyHover.GetBoolean() ? ThumbnailTitleMode.Hover : ThumbnailTitleMode.Hidden;
+            }
         }
         catch { Current = new(); }
         Normalize();
@@ -60,6 +69,7 @@ public sealed class SettingsStore
         if (!Enum.IsDefined(Current.SizeMode)) Current.SizeMode = ThumbnailSizeMode.Adaptive;
         if (!Enum.IsDefined(Current.UniformContent)) Current.UniformContent = UniformContentMode.Crop;
         if (!Enum.IsDefined(Current.Language)) Current.Language = AppLanguage.English;
+        if (!Enum.IsDefined(Current.TitleMode)) Current.TitleMode = ThumbnailTitleMode.Hover;
     }
 
     private void ApplyAutoStart()

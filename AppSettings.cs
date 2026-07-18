@@ -6,6 +6,7 @@ public enum ThumbnailFrameStyle { None, Square, Rounded }
 public enum ThumbnailSizeMode { Adaptive, Uniform }
 public enum UniformContentMode { Crop, Contain }
 public enum AppLanguage { Danish, English }
+public enum ThumbnailTitleMode { Hover, Hidden, AlwaysInside, AlwaysAbove }
 // Keep the original numeric values stable because enums are persisted as numbers in settings.json.
 public enum ThumbnailIconPosition { TopLeft = 0, TopRight = 1, BottomLeft = 2, BottomRight = 3, TopCenter = 4, BottomCenter = 5 }
 
@@ -26,8 +27,9 @@ public sealed class AppSettings
     public ScreenCorner Corner { get; set; } = ScreenCorner.BottomRight;
     public ThumbnailFlow Flow { get; set; } = ThumbnailFlow.Horizontal;
     public bool AutoStart { get; set; }
+    public bool AutomaticUpdateChecks { get; set; } = true;
     public bool ShowProgramIcon { get; set; } = true;
-    public bool ShowTitleOnHover { get; set; } = true;
+    public ThumbnailTitleMode TitleMode { get; set; } = ThumbnailTitleMode.Hover;
     public bool RestoreOnSingleClick { get; set; }
     public ThumbnailFrameStyle FrameStyle { get; set; } = ThumbnailFrameStyle.None;
     public ThumbnailIconPosition IconPosition { get; set; } = ThumbnailIconPosition.TopRight;

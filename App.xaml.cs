@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
+using System.IO;
 using System.Windows;
 using Microsoft.Win32;
 using Forms = System.Windows.Forms;
@@ -18,6 +19,8 @@ public partial class App : Application
     private WindowManager? _manager;
     private SettingsStore? _store;
     private SettingsWindow? _settingsWindow;
+    private RuntimeStateStore? _runtimeState;
+    private UpdateService? _updates;
     private Icon? _trayIcon;
     private TrayMenuWindow? _trayMenuWindow;
     private Mutex? _instanceMutex;
@@ -28,12 +31,40 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (InstallationManager.TryRunMaintenance(e.Args))
+        {
+            Shutdown();
+            return;
+        }
         _store = new SettingsStore();
         _store.Load();
+        _runtimeState = new RuntimeStateStore();
+        _runtimeState.Load();
+        if (e.Args.Contains("--request-uninstall", StringComparer.OrdinalIgnoreCase))
+        {
+            HandleUninstallRequest();
+            return;
+        }
         if (!EnsureSingleInstance())
         {
             Shutdown();
             return;
+        }
+        if (!e.Args.Contains("--portable", StringComparer.OrdinalIgnoreCase) && InstallationManager.ShouldOfferInstallation(_runtimeState))
+        {
+            var firstRun = new FirstRunWindow(_store.Current.Language);
+            if (firstRun.ShowDialog() != true) { Shutdown(); return; }
+            if (firstRun.Choice is { Scope: InstallationScope.Portable })
+                _runtimeState.DismissPortablePrompt(InstallationManager.CurrentExecutable);
+            else if (firstRun.Choice is { } choice)
+            {
+                if (InstallationManager.BeginInstall(choice.Scope, choice.StartMenuShortcut, choice.DesktopShortcut))
+                {
+                    Shutdown();
+                    return;
+                }
+                MessageBox.Show(Localizer.T(_store.Current.Language, "Installationen kunne ikke startes."), "Minimemizer", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
         StartExitListener();
         _manager = new WindowManager(_store);
@@ -57,6 +88,9 @@ public partial class App : Application
             Icon = _trayIcon ?? SystemIcons.Application,
             Visible = true
         };
+        _tray.BalloonTipClicked += (_, _) => Dispatcher.Invoke(() => ShowSettings("about"));
+        _updates = new UpdateService(_store, _runtimeState);
+        _updates.UpdateAvailable += UpdateAvailable;
         _tray.DoubleClick += (_, _) => ShowSettings();
         _tray.MouseUp += (_, args) =>
         {
@@ -66,9 +100,66 @@ public partial class App : Application
         SystemEvents.DisplaySettingsChanged += DisplaySettingsChanged;
         if (e.Args.Contains("--settings", StringComparer.OrdinalIgnoreCase))
             Dispatcher.BeginInvoke(ShowSettings);
+        if (e.Args.Contains("--about", StringComparer.OrdinalIgnoreCase))
+            Dispatcher.BeginInvoke(() => ShowSettings("about"));
         if (e.Args.Contains("--tray-menu", StringComparer.OrdinalIgnoreCase))
             Dispatcher.BeginInvoke(ShowTrayMenu);
+        WriteMaintenanceHealthMarker(e.Args);
+        BeginMaintenanceCleanup(e.Args);
+        _ = _updates.CheckAutomaticallyAsync();
     }
+
+    private static void WriteMaintenanceHealthMarker(string[] args)
+    {
+        var index = Array.FindIndex(args, value => value.Equals("--maintenance-health", StringComparison.OrdinalIgnoreCase));
+        if (index < 0 || index + 1 >= args.Length) return;
+        try { File.WriteAllText(args[index + 1], "ok"); }
+        catch { }
+    }
+
+    private static void BeginMaintenanceCleanup(string[] args)
+    {
+        var index = Array.FindIndex(args, value => value.Equals("--maintenance-cleanup", StringComparison.OrdinalIgnoreCase));
+        if (index < 0 || index + 2 >= args.Length || !int.TryParse(args[index + 2], out var helperPid)) return;
+        var source = args[index + 1];
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                using var helper = Process.GetProcessById(helperPid);
+                helper.WaitForExit(15000);
+            }
+            catch (ArgumentException) { }
+            try
+            {
+                if (File.Exists(source)) File.Delete(source);
+                var directory = Path.GetDirectoryName(source);
+                if (directory is not null && Directory.Exists(directory) && !Directory.EnumerateFileSystemEntries(directory).Any()) Directory.Delete(directory);
+            }
+            catch { }
+        });
+    }
+
+    private void HandleUninstallRequest()
+    {
+        if (_store is null) { Shutdown(); return; }
+        var installation = InstallationManager.DetectCurrent();
+        if (!installation.IsInstalled) { Shutdown(); return; }
+        var language = _store.Current.Language;
+        if (MessageBox.Show(Localizer.T(language, "Vil du afinstallere Minimemizer?"), "Minimemizer", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        { Shutdown(); return; }
+        var delete = MessageBox.Show(Localizer.T(language, "Vil du også slette dine personlige indstillinger?"), "Minimemizer", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+        InstallationManager.BeginUninstall(installation, delete);
+        Shutdown();
+    }
+
+    private void UpdateAvailable(object? sender, AvailableUpdate update) => Dispatcher.BeginInvoke(() =>
+    {
+        if (_tray is null || _store is null) return;
+        _tray.BalloonTipTitle = "Minimemizer";
+        _tray.BalloonTipText = string.Format(Localizer.T(_store.Current.Language, "Version {0} er tilgængelig."), update.Version.ToString(3));
+        _tray.ShowBalloonTip(5000);
+    });
 
     private void DisplaySettingsChanged(object? sender, EventArgs e) => Dispatcher.Invoke(() => _manager?.Relayout());
 
@@ -178,11 +269,12 @@ public partial class App : Application
         }, null, Timeout.Infinite, executeOnlyOnce: true);
     }
 
-    private void ShowSettings()
+    private void ShowSettings(string initialPage = "general")
     {
         if (_store is null || _manager is null) return;
         if (_settingsWindow is { IsVisible: true }) { _settingsWindow.Activate(); return; }
-        _settingsWindow = new SettingsWindow(_store, _manager);
+        if (_updates is null) return;
+        _settingsWindow = new SettingsWindow(_store, _manager, _updates, initialPage);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
         _settingsWindow.Activate();
@@ -192,7 +284,7 @@ public partial class App : Application
     {
         if (_store is null) return;
         _trayMenuWindow?.Close();
-        _trayMenuWindow = new TrayMenuWindow(_store.Current.Language, ShowSettings, Shutdown);
+        _trayMenuWindow = new TrayMenuWindow(_store.Current.Language, () => ShowSettings(), Shutdown);
         _trayMenuWindow.Closed += (_, _) => _trayMenuWindow = null;
         _trayMenuWindow.ShowNearCursor();
     }
@@ -204,6 +296,8 @@ public partial class App : Application
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); }
         _trayMenuWindow?.Close();
         _trayIcon?.Dispose();
+        if (_updates is not null) _updates.UpdateAvailable -= UpdateAvailable;
+        _updates?.Dispose();
         _exitWaitRegistration?.Unregister(null);
         _exitRequestedEvent?.Dispose();
         if (_ownsInstanceMutex) _instanceMutex?.ReleaseMutex();

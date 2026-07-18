@@ -2,6 +2,7 @@
 bin/
 obj/
 release/
+artifacts/
 
 # IDE and user files
 .vs/

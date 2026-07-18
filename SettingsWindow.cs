@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -23,6 +24,7 @@ using MessageBox = System.Windows.MessageBox;
 using Control = System.Windows.Controls.Control;
 using SystemColors = System.Windows.SystemColors;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
+using Application = System.Windows.Application;
 using Color = System.Windows.Media.Color;
 using Path = System.IO.Path;
 
@@ -32,6 +34,7 @@ public sealed class SettingsWindow : Window
 {
     private readonly SettingsStore _store;
     private readonly WindowManager _manager;
+    private readonly UpdateService _updates;
     private readonly AppSettings _draft;
     private readonly Dictionary<string, Button> _navigation = [];
     private readonly Grid _pageHost = new();
@@ -42,25 +45,32 @@ public sealed class SettingsWindow : Window
     private ListBox _zoneRules = new();
     private ComboBox _contentMode = new(), _iconPosition = new();
     private bool _isDark;
+    private string _currentPage = "general";
     public event EventHandler? LanguageChanged;
     private AppLanguage UiLanguage => _draft.Language;
     private string T(string danish) => Localizer.T(UiLanguage, danish);
 
-    public SettingsWindow(SettingsStore store, WindowManager manager)
+    internal SettingsWindow(SettingsStore store, WindowManager manager, UpdateService updates, string initialPage = "general")
     {
         _store = store;
         _manager = manager;
+        _updates = updates;
         _draft = JsonSerializer.Deserialize<AppSettings>(JsonSerializer.Serialize(store.Current)) ?? new AppSettings();
         Title = $"Minimemizer – {T("Indstillinger")}";
         Width = 920; Height = 680; MinWidth = 780; MinHeight = 570;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Content = BuildShell();
         ApplySystemTheme();
-        ShowPage("general");
+        ShowPage(initialPage);
         Loaded += (_, _) => ApplySystemTheme();
         SourceInitialized += (_, _) => ApplyNativeAppearance();
         SystemEvents.UserPreferenceChanged += SystemThemeChanged;
-        Closed += (_, _) => SystemEvents.UserPreferenceChanged -= SystemThemeChanged;
+        _updates.StateChanged += UpdateStateChanged;
+        Closed += (_, _) =>
+        {
+            SystemEvents.UserPreferenceChanged -= SystemThemeChanged;
+            _updates.StateChanged -= UpdateStateChanged;
+        };
     }
 
     private UIElement BuildShell()
@@ -105,6 +115,7 @@ public sealed class SettingsWindow : Window
 
     private void ShowPage(string key)
     {
+        _currentPage = key;
         foreach (var pair in _navigation) pair.Value.SetValue(Control.FontWeightProperty, pair.Key == key ? FontWeights.SemiBold : FontWeights.Normal);
         _pageHost.Children.Clear();
         var (title, description, page) = key switch
@@ -124,6 +135,7 @@ public sealed class SettingsWindow : Window
         var panel = PagePanel();
         panel.Children.Add(FluentCard.Create(T("Sprog"), T("Vælg sproget i Minimemizer."), Choice(new[] { (AppLanguage.Danish, T("Dansk")), (AppLanguage.English, T("Engelsk")) }, _draft.Language, value => _draft.Language = value)));
         panel.Children.Add(FluentCard.Create(T("Start med Windows"), T("Start automatisk, når du logger ind."), Toggle(_draft.AutoStart, value => _draft.AutoStart = value)));
+        panel.Children.Add(FluentCard.Create(T("Søg automatisk efter opdateringer"), T("Kontrollér højst én gang dagligt, om en ny stabil version er tilgængelig."), Toggle(_draft.AutomaticUpdateChecks, value => _draft.AutomaticUpdateChecks = value)));
         panel.Children.Add(FluentCard.Create(T("Åbn thumbnail"), T("Vælg om et program gendannes med enkelt- eller dobbeltklik."), Choice(new[] { (false, T("Dobbeltklik")), (true, T("Enkeltklik")) }, _draft.RestoreOnSingleClick, value => _draft.RestoreOnSingleClick = value)));
         panel.Children.Add(FluentCard.Create(T("Højrekliksmenu"), T("Vis programmets klassiske vinduesmenu."), Toggle(_draft.EnableThumbnailContextMenu, value => _draft.EnableThumbnailContextMenu = value)));
         return Scroll(panel);
@@ -150,7 +162,14 @@ public sealed class SettingsWindow : Window
         panel.Children.Add(FluentCard.Create(T("Programikon"), T("Vis programmets ikon oven på thumbnailen."), Toggle(_draft.ShowProgramIcon, value => { _draft.ShowProgramIcon = value; _iconPosition.IsEnabled = value; Preview(); })));
         ConfigureChoice(_iconPosition, IconChoices(), _draft.IconPosition, value => { _draft.IconPosition = value; Preview(); }); _iconPosition.IsEnabled = _draft.ShowProgramIcon;
         panel.Children.Add(FluentCard.Create(T("Ikonplacering"), T("Vælg ikonets placering på thumbnailen."), _iconPosition));
-        panel.Children.Add(FluentCard.Create(T("Titel ved hover"), T("Vis programmets titel, når musen holdes over thumbnailen."), Toggle(_draft.ShowTitleOnHover, value => _draft.ShowTitleOnHover = value)));
+        panel.Children.Add(FluentCard.Create(T("Vinduestitel"), T("Vælg om og hvor vinduets forkortede titel skal vises."),
+            Choice(new[]
+            {
+                (ThumbnailTitleMode.Hidden, T("Skjult")),
+                (ThumbnailTitleMode.Hover, T("Kun ved hover")),
+                (ThumbnailTitleMode.AlwaysInside, T("Altid inde i thumbnail")),
+                (ThumbnailTitleMode.AlwaysAbove, T("Altid over thumbnail"))
+            }, _draft.TitleMode, value => { _draft.TitleMode = value; Preview(); })));
         return Scroll(panel);
     }
 
@@ -209,8 +228,73 @@ public sealed class SettingsWindow : Window
         panel.Children.Add(FluentCard.Create(T("Version"), T("Den installerede version af Minimemizer."), ValueText(version)));
         panel.Children.Add(FluentCard.Create(T("Arkitektur"), T("Den processorarkitektur denne udgave er bygget til."), ValueText(ArchitectureName(RuntimeInformation.ProcessArchitecture))));
         panel.Children.Add(FluentCard.Create(T("System"), T("Den Windows-arkitektur programmet kører på."), ValueText(ArchitectureName(RuntimeInformation.OSArchitecture))));
-        panel.Children.Add(FluentCard.Create(T("Flere oplysninger"), T("Der kan tilføjes support-, licens- og weboplysninger her senere."), ValueText("—")));
+        var updateControls = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var updateStatus = new TextBlock { Text = UpdateStatusText(), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0), MaxWidth = 250, TextWrapping = TextWrapping.Wrap };
+        var check = MakeButton(T("Søg nu"), false);
+        check.Click += async (_, _) => { await _updates.CheckAsync(force: true); };
+        updateControls.Children.Add(updateStatus);
+        updateControls.Children.Add(check);
+        if (_updates.Available is not null)
+        {
+            var release = MakeButton(T("Se release"), false);
+            release.Margin = new Thickness(8, 0, 0, 0);
+            release.Click += (_, _) => Process.Start(new ProcessStartInfo(_updates.Available.ReleaseUrl) { UseShellExecute = true });
+            updateControls.Children.Add(release);
+            var installUpdate = MakeButton(T("Installér opdatering"), true);
+            installUpdate.Margin = new Thickness(8, 0, 0, 0);
+            installUpdate.Click += async (_, _) =>
+            {
+                if (MessageBox.Show(this, T("Download og installér opdateringen nu? Minimemizer genstartes."), "Minimemizer", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                PersistChanges(closeAfterSave: false);
+                if (await _updates.DownloadAndStartUpdateAsync()) Application.Current.Shutdown();
+            };
+            updateControls.Children.Add(installUpdate);
+        }
+        panel.Children.Add(FluentCard.Create(T("Opdateringer"), T("Stabile versioner hentes fra GitHub Releases og verificeres med SHA-256."), updateControls));
+
+        var installation = InstallationManager.DetectCurrent();
+        var maintenance = MakeButton(installation.IsInstalled ? T("Afinstallér…") : T("Installér Minimemizer…"), false);
+        maintenance.Click += (_, _) =>
+        {
+            if (installation.IsInstalled) RequestUninstall(installation);
+            else RequestInstall();
+        };
+        panel.Children.Add(FluentCard.Create(T("Installation"), installation.IsInstalled
+            ? T("Minimemizer er installeret på denne computer.")
+            : T("Denne kopi kører som portable udgave."), maintenance));
         return Scroll(panel);
+    }
+
+    private string UpdateStatusText() => _updates.Status switch
+    {
+        UpdateStatus.Checking => T("Søger…"),
+        UpdateStatus.UpToDate => T("Du har den nyeste version."),
+        UpdateStatus.Available => string.Format(T("Version {0} er tilgængelig."), _updates.Available?.Version.ToString(3)),
+        UpdateStatus.Downloading => T("Downloader og verificerer…"),
+        UpdateStatus.Failed => T("Opdateringstjek mislykkedes: ") + _updates.ErrorMessage,
+        _ => T("Ikke kontrolleret endnu.")
+    };
+
+    private void UpdateStateChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(() =>
+    {
+        if (_currentPage == "about") ShowPage("about");
+    });
+
+    private void RequestInstall()
+    {
+        var dialog = new FirstRunWindow(UiLanguage) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.Choice is not { } choice || choice.Scope == InstallationScope.Portable) return;
+        PersistChanges(closeAfterSave: false);
+        if (InstallationManager.BeginInstall(choice.Scope, choice.StartMenuShortcut, choice.DesktopShortcut)) Application.Current.Shutdown();
+        else MessageBox.Show(this, T("Installationen kunne ikke startes."), "Minimemizer", MessageBoxButton.OK, MessageBoxImage.Error);
+    }
+
+    private void RequestUninstall(InstallationInfo installation)
+    {
+        if (MessageBox.Show(this, T("Vil du afinstallere Minimemizer?"), "Minimemizer", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        var delete = MessageBox.Show(this, T("Vil du også slette dine personlige indstillinger?"), "Minimemizer", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+        if (InstallationManager.BeginUninstall(installation, delete)) Application.Current.Shutdown();
+        else MessageBox.Show(this, T("Afinstallationen kunne ikke startes."), "Minimemizer", MessageBoxButton.OK, MessageBoxImage.Error);
     }
 
     private static TextBlock ValueText(string value) => new() { Text = value, FontSize = 15, FontWeight = FontWeights.SemiBold, MinWidth = 110, TextAlignment = TextAlignment.Right };
@@ -294,29 +378,13 @@ public sealed class SettingsWindow : Window
 
     private void ShowZonePicker(Button anchor, ProgramZoneRule rule)
     {
-        var menu = FluentMenu.Create(_isDark);
-        menu.PlacementTarget = anchor;
-        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
-        foreach (var screen in Forms.Screen.AllScreens)
+        var current = new ThumbnailZone(rule.ScreenDeviceName, rule.Corner);
+        ZonePickerWindow.ShowForAnchor(anchor, UiLanguage, current, zone =>
         {
-            var display = ThumbnailZones.DisplayLabel(UiLanguage, screen.DeviceName, Forms.Screen.AllScreens);
-            foreach (var corner in Enum.GetValues<ScreenCorner>())
-            {
-                var cornerItem = new MenuItem
-                {
-                    Header = $"{display} · {ThumbnailZones.CornerLabel(UiLanguage, corner)}",
-                    IsChecked = string.Equals(rule.ScreenDeviceName, screen.DeviceName, StringComparison.OrdinalIgnoreCase) && rule.Corner == corner
-                };
-                cornerItem.Click += (_, _) =>
-                {
-                    rule.ScreenDeviceName = screen.DeviceName;
-                    rule.Corner = corner;
-                    RefreshZoneRules(rule);
-                };
-                menu.Items.Add(cornerItem);
-            }
-        }
-        menu.IsOpen = true;
+            rule.ScreenDeviceName = zone.ScreenDeviceName;
+            rule.Corner = zone.Corner;
+            RefreshZoneRules(rule);
+        });
     }
 
     private void RemoveZoneRule()
