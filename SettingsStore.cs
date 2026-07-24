@@ -70,6 +70,7 @@ public sealed class SettingsStore
         if (!Enum.IsDefined(Current.UniformContent)) Current.UniformContent = UniformContentMode.Crop;
         if (!Enum.IsDefined(Current.Language)) Current.Language = AppLanguage.English;
         if (!Enum.IsDefined(Current.TitleMode)) Current.TitleMode = ThumbnailTitleMode.Hover;
+        if (!Enum.IsDefined(Current.DesktopIconsModifier)) Current.DesktopIconsModifier = DesktopIconModifier.Control;
     }
 
     private void ApplyAutoStart()

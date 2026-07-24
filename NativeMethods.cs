@@ -34,6 +34,7 @@ internal static class NativeMethods
     internal const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOZORDER = 0x0004, SWP_NOACTIVATE = 0x0010, SWP_FRAMECHANGED = 0x0020;
     internal const uint TPM_RETURNCMD = 0x0100, TPM_RIGHTBUTTON = 0x0002;
     internal const uint WM_SYSCOMMAND = 0x0112, SC_RESTORE = 0xF120;
+    internal const uint WM_COMMAND = 0x0111;
 
     internal delegate void WinEventDelegate(nint hook, uint eventType, nint hwnd, int idObject, int idChild, uint eventThread, uint eventTime);
     internal delegate bool EnumWindowsProc(nint hwnd, nint lParam);
@@ -60,6 +61,14 @@ internal static class NativeMethods
     [DllImport("user32.dll")] internal static extern nint GetSystemMenu(nint hwnd, bool revert);
     [DllImport("user32.dll")] internal static extern uint TrackPopupMenuEx(nint menu, uint flags, int x, int y, nint owner, nint parameters);
     [DllImport("user32.dll")] internal static extern bool GetCursorPos(out Point point);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern nint FindWindow(string? className, string? windowName);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern nint FindWindowEx(nint parent, nint childAfter, string? className, string? windowName);
+    [DllImport("user32.dll")] internal static extern nint WindowFromPoint(Point point);
+    [DllImport("user32.dll")] internal static extern bool IsChild(nint parent, nint child);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern int GetClassName(nint hwnd, StringBuilder className, int maxCount);
+    [DllImport("user32.dll")] internal static extern uint GetDoubleClickTime();
+    [DllImport("user32.dll")] internal static extern short GetAsyncKeyState(int virtualKey);
+    [DllImport("user32.dll")] internal static extern nint SendMessage(nint hwnd, uint message, nint wParam, nint lParam);
     internal delegate nint LowLevelMouseProc(int code, nint wParam, nint lParam);
     [DllImport("user32.dll")] internal static extern nint SetWindowsHookEx(int hookId, LowLevelMouseProc callback, nint module, uint threadId);
     [DllImport("user32.dll")] internal static extern bool UnhookWindowsHookEx(nint hook);

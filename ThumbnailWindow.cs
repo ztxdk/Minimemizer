@@ -41,6 +41,7 @@ internal sealed class ThumbnailWindow : Window
     private ThumbnailIconPosition _iconPosition = ThumbnailIconPosition.TopRight;
     private int _opacityPercent = 100;
     private bool _contextMenuEnabled = true;
+    private bool _componentVisible = true;
     private readonly Border _frameBorder;
     private readonly Button _zoneMenuButton;
     private readonly System.Windows.Controls.ToolTip _titleToolTip;
@@ -407,6 +408,22 @@ internal sealed class ThumbnailWindow : Window
         ApplyIconPosition(_showIcon);
     }
 
+    internal void SetComponentVisibility(bool visible)
+    {
+        _componentVisible = visible;
+        if (!visible)
+        {
+            _titleToolTip.IsOpen = false;
+            _zoneMenuButton.Visibility = Visibility.Collapsed;
+            ApplyIconPosition(false);
+            if (IsVisible) Hide();
+            return;
+        }
+
+        if (!IsVisible) Show();
+        ApplyIconPosition(_showIcon);
+    }
+
     internal void RefreshTitle()
     {
         if (!NativeMethods.IsWindow(_source)) return;
@@ -428,7 +445,7 @@ internal sealed class ThumbnailWindow : Window
     {
         var previewTop = _titleMode == ThumbnailTitleMode.AlwaysAbove ? _effectiveTitleBarHeightPixels : 0;
         _iconBadge?.ApplyPosition(_pixelX, _pixelY + previewTop, _pixelWidth,
-            Math.Max(1, _pixelHeight - previewTop), _iconPosition, visible);
+            Math.Max(1, _pixelHeight - previewTop), _iconPosition, visible && _componentVisible);
     }
 
     private void ApplyTitleLayout()

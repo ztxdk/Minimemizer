@@ -7,6 +7,7 @@ public enum ThumbnailSizeMode { Adaptive, Uniform }
 public enum UniformContentMode { Crop, Contain }
 public enum AppLanguage { Danish, English }
 public enum ThumbnailTitleMode { Hover, Hidden, AlwaysInside, AlwaysAbove }
+public enum DesktopIconModifier { Control, Shift, Alt }
 // Keep the original numeric values stable because enums are persisted as numbers in settings.json.
 public enum ThumbnailIconPosition { TopLeft = 0, TopRight = 1, BottomLeft = 2, BottomRight = 3, TopCenter = 4, BottomCenter = 5 }
 
@@ -29,6 +30,9 @@ public sealed class AppSettings
     public bool WrapZoneLayout { get; set; }
     public bool AutoStart { get; set; }
     public bool AutomaticUpdateChecks { get; set; } = true;
+    public bool ToggleDesktopIconsOnEmptyDoubleClick { get; set; }
+    public bool HideThumbnailsWithDesktopIcons { get; set; }
+    public DesktopIconModifier DesktopIconsModifier { get; set; } = DesktopIconModifier.Control;
     public bool ShowProgramIcon { get; set; } = true;
     public ThumbnailTitleMode TitleMode { get; set; } = ThumbnailTitleMode.Hover;
     public bool RestoreOnSingleClick { get; set; }

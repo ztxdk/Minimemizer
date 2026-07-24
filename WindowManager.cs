@@ -23,6 +23,7 @@ public sealed class WindowManager : IDisposable
     private nint _cloakHook;
     private readonly DispatcherTimer _scanTimer;
     private ThumbnailWindow? _draggedWindow;
+    private bool _thumbnailsVisible = true;
     private bool _disposed;
 
     public WindowManager(SettingsStore store)
@@ -93,6 +94,7 @@ public sealed class WindowManager : IDisposable
         window.ZoneMenuRequested += ShowZoneMenu;
         _thumbnails.Add(hwnd, window);
         window.Show();
+        if (!_thumbnailsVisible) window.SetComponentVisibility(false);
         if (!window.HasRegisteredThumbnail || !NativeMethods.IsWindow(hwnd) || !NativeMethods.IsIconic(hwnd) || NativeMethods.IsWindowCloaked(hwnd))
         {
             Remove(hwnd, relayout: false);
@@ -132,6 +134,22 @@ public sealed class WindowManager : IDisposable
     {
         ScanWindows();
         Relayout();
+    }
+
+    public void SetThumbnailsVisible(bool visible)
+    {
+        if (_disposed || _thumbnailsVisible == visible) return;
+        _thumbnailsVisible = visible;
+        if (!visible)
+        {
+            EndDrag();
+            foreach (var window in _thumbnails.Values) window.SetComponentVisibility(false);
+            return;
+        }
+
+        Relayout();
+        foreach (var window in _thumbnails.Values)
+            window.SetComponentVisibility(true);
     }
 
     public void PreviewOpacity(int opacityPercent)

@@ -20,6 +20,7 @@ public partial class App : Application
     private SettingsWindow? _settingsWindow;
     private RuntimeStateStore? _runtimeState;
     private UpdateService? _updates;
+    private DesktopIconService? _desktopIcons;
     private Icon? _trayIcon;
     private TrayMenuWindow? _trayMenuWindow;
     private Mutex? _instanceMutex;
@@ -69,6 +70,9 @@ public partial class App : Application
         StartExitListener();
         _manager = new WindowManager(_store);
         _manager.Start();
+        _desktopIcons = new DesktopIconService(_store, _manager, message =>
+            ThemedDialogWindow.ShowError(null, Localizer.T(_store.Current.Language, "Skrivebordsikoner"), message));
+        _desktopIcons.Start();
 
         try
         {
@@ -276,8 +280,8 @@ public partial class App : Application
     {
         if (_store is null || _manager is null) return;
         if (_settingsWindow is { IsVisible: true }) { _settingsWindow.Activate(); return; }
-        if (_updates is null) return;
-        _settingsWindow = new SettingsWindow(_store, _manager, _updates, initialPage);
+        if (_updates is null || _desktopIcons is null) return;
+        _settingsWindow = new SettingsWindow(_store, _manager, _updates, _desktopIcons, initialPage);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
         _settingsWindow.Activate();
@@ -285,9 +289,10 @@ public partial class App : Application
 
     private void ShowTrayMenu()
     {
-        if (_store is null) return;
+        if (_store is null || _desktopIcons is null) return;
         _trayMenuWindow?.Close();
-        _trayMenuWindow = new TrayMenuWindow(_store.Current.Language, () => ShowSettings(), Shutdown);
+        _trayMenuWindow = new TrayMenuWindow(_store.Current.Language, _desktopIcons.IconsVisible,
+            _desktopIcons.ToggleIcons, () => ShowSettings(), Shutdown);
         _trayMenuWindow.Closed += (_, _) => _trayMenuWindow = null;
         _trayMenuWindow.ShowNearCursor();
     }
@@ -295,6 +300,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         SystemEvents.DisplaySettingsChanged -= DisplaySettingsChanged;
+        _desktopIcons?.Dispose();
         _manager?.Dispose();
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); }
         _trayMenuWindow?.Close();

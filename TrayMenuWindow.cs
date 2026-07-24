@@ -18,9 +18,9 @@ internal sealed class TrayMenuWindow : Window
 {
     private bool _isClosing;
 
-    internal TrayMenuWindow(AppLanguage language, Action openSettings, Action exit)
+    internal TrayMenuWindow(AppLanguage language, bool iconsVisible, Action toggleDesktopIcons, Action openSettings, Action exit)
     {
-        Width = 172;
+        Width = 238;
         SizeToContent = SizeToContent.Height;
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
@@ -37,6 +37,8 @@ internal sealed class TrayMenuWindow : Window
         var borderBrush = new SolidColorBrush(dark ? Color.FromRgb(82, 82, 82) : Color.FromRgb(205, 205, 205));
 
         var stack = new StackPanel { Margin = new Thickness(4) };
+        stack.Children.Add(MenuButton("▦", Localizer.T(language, iconsVisible ? "Skjul skrivebordsikoner" : "Vis skrivebordsikoner"), foreground, hover, () => RunAndClose(toggleDesktopIcons)));
+        stack.Children.Add(new Border { Height = 1, Background = borderBrush, Margin = new Thickness(7, 2, 7, 2) });
         stack.Children.Add(MenuButton("⚙", Localizer.T(language, "Indstillinger"), foreground, hover, () => RunAndClose(openSettings)));
         stack.Children.Add(new Border { Height = 1, Background = borderBrush, Margin = new Thickness(7, 2, 7, 2) });
         stack.Children.Add(MenuButton("⏻", Localizer.T(language, "Afslut"), foreground, hover, () => RunAndClose(exit)));

@@ -34,6 +34,7 @@ public sealed class SettingsWindow : Window
     private readonly SettingsStore _store;
     private readonly WindowManager _manager;
     private readonly UpdateService _updates;
+    private readonly DesktopIconService _desktopIcons;
     private readonly AppSettings _draft;
     private readonly Dictionary<string, Button> _navigation = [];
     private readonly Grid _pageHost = new();
@@ -49,11 +50,12 @@ public sealed class SettingsWindow : Window
     private AppLanguage UiLanguage => _draft.Language;
     private string T(string danish) => Localizer.T(UiLanguage, danish);
 
-    internal SettingsWindow(SettingsStore store, WindowManager manager, UpdateService updates, string initialPage = "general")
+    internal SettingsWindow(SettingsStore store, WindowManager manager, UpdateService updates, DesktopIconService desktopIcons, string initialPage = "general")
     {
         _store = store;
         _manager = manager;
         _updates = updates;
+        _desktopIcons = desktopIcons;
         _draft = JsonSerializer.Deserialize<AppSettings>(JsonSerializer.Serialize(store.Current)) ?? new AppSettings();
         Title = $"Minimemizer – {T("Indstillinger")}";
         Width = 920; Height = 680; MinWidth = 780; MinHeight = 570;
@@ -135,6 +137,9 @@ public sealed class SettingsWindow : Window
         panel.Children.Add(FluentCard.Create(T("Sprog"), T("Vælg sproget i Minimemizer."), Choice(new[] { (AppLanguage.Danish, T("Dansk")), (AppLanguage.English, T("Engelsk")) }, _draft.Language, value => _draft.Language = value)));
         panel.Children.Add(FluentCard.Create(T("Start med Windows"), T("Start automatisk, når du logger ind."), Toggle(_draft.AutoStart, value => _draft.AutoStart = value)));
         panel.Children.Add(FluentCard.Create(T("Søg automatisk efter opdateringer"), T("Kontrollér højst én gang dagligt, om en ny stabil version er tilgængelig."), Toggle(_draft.AutomaticUpdateChecks, value => _draft.AutomaticUpdateChecks = value)));
+        panel.Children.Add(FluentCard.Create(T("Dobbeltklik på skrivebordet"), T("Skjul eller vis skrivebordsikoner ved at dobbeltklikke på et tomt område."), Toggle(_draft.ToggleDesktopIconsOnEmptyDoubleClick, value => _draft.ToggleDesktopIconsOnEmptyDoubleClick = value)));
+        panel.Children.Add(FluentCard.Create(T("Skjul skrivebordsindhold"), T("Vælg om det normale skift kun skjuler ikoner eller også Minimemizer-thumbnails."), Choice(new[] { (false, T("Kun ikoner")), (true, T("Ikoner og thumbnails")) }, _draft.HideThumbnailsWithDesktopIcons, value => _draft.HideThumbnailsWithDesktopIcons = value)));
+        panel.Children.Add(FluentCard.Create(T("Modifier-tast"), T("I tilstanden Kun ikoner kan tasten holdes nede under dobbeltklik for også at skjule thumbnails."), Choice(new[] { (DesktopIconModifier.Control, "Ctrl"), (DesktopIconModifier.Shift, "Shift"), (DesktopIconModifier.Alt, "Alt") }, _draft.DesktopIconsModifier, value => _draft.DesktopIconsModifier = value)));
         panel.Children.Add(FluentCard.Create(T("Åbn thumbnail"), T("Vælg om et program gendannes med enkelt- eller dobbeltklik."), Choice(new[] { (false, T("Dobbeltklik")), (true, T("Enkeltklik")) }, _draft.RestoreOnSingleClick, value => _draft.RestoreOnSingleClick = value)));
         panel.Children.Add(FluentCard.Create(T("Højrekliksmenu"), T("Vis programmets klassiske vinduesmenu."), Toggle(_draft.EnableThumbnailContextMenu, value => _draft.EnableThumbnailContextMenu = value)));
         return Scroll(panel);
@@ -423,6 +428,7 @@ public sealed class SettingsWindow : Window
             foreach (var property in typeof(AppSettings).GetProperties().Where(p => p.CanRead && p.CanWrite)) property.SetValue(target, property.GetValue(_draft));
             _store.Save();
             _manager.Refresh();
+            _desktopIcons.ApplySettings();
             LanguageChanged?.Invoke(this, EventArgs.Empty);
             if (closeAfterSave) Close();
         }

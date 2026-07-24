@@ -21,7 +21,7 @@ The application icon is embedded in all official ARM64 and x64 builds and is als
 5. A thumbnail of the application appears on the desktop.
 6. Single- or double-click the thumbnail to restore the application.
 
-Minimemizer runs in the background and appears in the system tray next to the Windows clock. Right-click the tray icon to open **Settings** or exit the application.
+Minimemizer runs in the background and appears in the system tray next to the Windows clock. Right-click the tray icon to hide or show desktop icons, open **Settings**, or exit the application.
 
 > If the tray icon is not visible, it may be located under **Show hidden icons**.
 
@@ -51,6 +51,9 @@ The settings window follows the Windows light or dark theme. The interface suppo
 - **Language:** Choose English or Danish.
 - **Start with Windows:** Start Minimemizer automatically when you sign in.
 - **Check for updates automatically:** Check GitHub Releases at most once per day. Downloads and installation always require confirmation.
+- **Double-click the desktop:** Optionally hide or show normal Windows desktop icons by double-clicking an empty area.
+- **Hide desktop content:** Choose whether the normal desktop toggle hides only icons or icons and Minimemizer thumbnails.
+- **Modifier key:** In **Icons only** mode, hold the selected Ctrl, Shift, or Alt key during the desktop double-click to include thumbnails for that toggle.
 - **Open thumbnail:** Choose single-click or double-click.
 - **Right-click menu:** Show the application's classic window menu, including Restore, Maximize, and Close.
 
@@ -86,7 +89,7 @@ Add applications that Minimemizer should ignore, and manage default zone rules f
 
 ### About
 
-Displays the version, architecture, update status, and installation mode. Version 0.7.2 is available for ARM64 and x64. This page can check for updates, install a verified update, install a portable copy, or uninstall an installed copy.
+Displays the version, architecture, update status, and installation mode. Version 0.8.0 is available for ARM64 and x64. This page can check for updates, install a verified update, install a portable copy, or uninstall an installed copy.
 
 ## Installation, updates, and removal
 
@@ -104,6 +107,8 @@ Automatic checks require the GitHub repository and its release assets to be anon
 ## Everyday use
 
 - A thumbnail is created automatically when an application is minimized.
+- Desktop icons can be hidden or shown from the tray menu or, when enabled, by double-clicking an empty desktop area.
+- Thumbnails can follow desktop icon visibility or be included temporarily by holding the configured modifier key.
 - Thumbnail windows are excluded from Windows Task View and Alt+Tab.
 - The thumbnail is removed when the application is restored or closed.
 - After dragging a thumbnail away from its default corner, select `⋯` to pin the application's other open thumbnails there or make the corner its persistent default.

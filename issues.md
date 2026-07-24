@@ -225,3 +225,32 @@ Når en ikke-installeret udgave startes første gang, skal brugeren tilbydes at 
 **Fokus:** Installationen skal vælge korrekt x64/ARM64-build, kunne oprette Startmenu-/skrivebordsgenvej efter brugerens valg og bevare settings i brugerens eksisterende `%APPDATA%\Minimemizer`-mappe. Update-funktionen fra punkt 16 skal kende installationsscope og opdatere den valgte placering med korrekt rettighedsniveau. Alle-brugere-installation må ikke gøre settings fælles mellem brugere.
 
 Der skal desuden defineres en sikker afinstallation, som som standard bevarer brugerens settings, men tilbyder at fjerne dem eksplicit.
+
+---
+
+## 18. “What’s new” efter opdatering
+**Fil:** Update-flow, `RuntimeStateStore.cs`, Settings/About
+**Alvor:** TODO
+
+Efter en vellykket opdatering skal Minimemizer vise en themed “What’s new”-dialog med de vigtigste ændringer i den nye version.
+
+**Fokus:**
+- Vis dialogen én gang pr. installeret version efter første vellykkede opstart.
+- Gem senest viste versionsnummer i runtime state, så dialogen ikke gentages.
+- Hent teksten sikkert fra release-informationen eller medtag den i programmet som fallback.
+- Tilføj mulighed for at genåbne “What’s new” fra Settings/About.
+- Følg programmets light/dark mode og understøt dansk og engelsk.
+
+---
+
+## 19. Kontrollér opdateringer ved programstart
+**Fil:** `App.xaml.cs`, `UpdateService.cs`, Settings/General
+**Alvor:** TODO
+
+Minimemizer skal automatisk kontrollere, om der findes en opdatering, når programmet starter, hvis automatiske opdateringstjek er aktiveret.
+
+**Fokus:**
+- Gennemgå om kontrollen skal udføres ved hver opstart eller fortsat højst én gang pr. døgn.
+- Bevar den korte opstartsforsinkelse, så netværkskaldet ikke forsinker selve programstarten.
+- Vis en diskret notifikation, hvis en nyere version findes, uden automatisk download eller installation.
+- Test både automatisk opstartstjek, fravalg i Settings, offline-start og manuelt “Søg nu”.
