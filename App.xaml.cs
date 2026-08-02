@@ -102,6 +102,7 @@ public partial class App : Application
                 Dispatcher.Invoke(ShowTrayMenu);
         };
         SystemEvents.DisplaySettingsChanged += DisplaySettingsChanged;
+        SystemEvents.PowerModeChanged += PowerModeChanged;
         if (e.Args.Contains("--settings", StringComparer.OrdinalIgnoreCase))
             Dispatcher.BeginInvoke(ShowSettings);
         if (e.Args.Contains("--about", StringComparer.OrdinalIgnoreCase))
@@ -170,6 +171,14 @@ public partial class App : Application
     });
 
     private void DisplaySettingsChanged(object? sender, EventArgs e) => Dispatcher.Invoke(() => _manager?.Relayout());
+
+    private void PowerModeChanged(object sender, PowerModeChangedEventArgs e)
+    {
+        if (e.Mode == PowerModes.Suspend)
+            Dispatcher.BeginInvoke(() => _manager?.SuspendForPowerTransition());
+        else if (e.Mode == PowerModes.Resume)
+            Dispatcher.BeginInvoke(() => _manager?.ResumeFromPowerTransition());
+    }
 
     private bool EnsureSingleInstance()
     {
@@ -300,6 +309,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         SystemEvents.DisplaySettingsChanged -= DisplaySettingsChanged;
+        SystemEvents.PowerModeChanged -= PowerModeChanged;
         _desktopIcons?.Dispose();
         _manager?.Dispose();
         if (_tray is not null) { _tray.Visible = false; _tray.Dispose(); }

@@ -22,6 +22,8 @@ public sealed class WindowManager : IDisposable
     private nint _destroyHook;
     private nint _cloakHook;
     private readonly DispatcherTimer _scanTimer;
+    private readonly DispatcherTimer _resumeTimer;
+    private int _resumePass;
     private ThumbnailWindow? _draggedWindow;
     private bool _thumbnailsVisible = true;
     private bool _disposed;
@@ -36,6 +38,11 @@ public sealed class WindowManager : IDisposable
             Interval = TimeSpan.FromMilliseconds(500)
         };
         _scanTimer.Tick += (_, _) => ScanWindows();
+        _resumeTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(750)
+        };
+        _resumeTimer.Tick += ResumeTimerTick;
     }
 
     public void Start()
@@ -134,6 +141,42 @@ public sealed class WindowManager : IDisposable
     {
         ScanWindows();
         Relayout();
+    }
+
+    public void SuspendForPowerTransition()
+    {
+        if (_disposed) return;
+        _scanTimer.Stop();
+        _resumeTimer.Stop();
+        EndDrag();
+    }
+
+    public void ResumeFromPowerTransition()
+    {
+        if (_disposed) return;
+        _scanTimer.Stop();
+        _resumeTimer.Stop();
+        _resumePass = 0;
+        _resumeTimer.Interval = TimeSpan.FromMilliseconds(750);
+        _resumeTimer.Start();
+    }
+
+    private void ResumeTimerTick(object? sender, EventArgs e)
+    {
+        if (_disposed) return;
+        _resumeTimer.Stop();
+        foreach (var window in _thumbnails.Values.ToArray())
+            window.RefreshAfterResume();
+        ScanWindows();
+        Relayout();
+
+        if (_resumePass++ == 0)
+        {
+            _resumeTimer.Interval = TimeSpan.FromSeconds(2);
+            _resumeTimer.Start();
+        }
+        else
+            _scanTimer.Start();
     }
 
     public void SetThumbnailsVisible(bool visible)
@@ -510,6 +553,7 @@ public sealed class WindowManager : IDisposable
         if (_disposed) return;
         _disposed = true;
         _scanTimer.Stop();
+        _resumeTimer.Stop();
         if (_minimizeHook != 0) NativeMethods.UnhookWinEvent(_minimizeHook);
         if (_destroyHook != 0) NativeMethods.UnhookWinEvent(_destroyHook);
         if (_cloakHook != 0) NativeMethods.UnhookWinEvent(_cloakHook);

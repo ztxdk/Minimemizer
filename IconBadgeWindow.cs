@@ -78,6 +78,14 @@ internal sealed class IconBadgeWindow : Window
             _iconImage.Opacity = Math.Clamp(opacityPercent / 100d, 0.2d, 1d);
     }
 
+    internal void RefreshAfterResume()
+    {
+        if (!HasIcon) return;
+        if (IsVisible) Hide();
+        InvalidateVisual();
+        UpdateLayout();
+    }
+
     private static BitmapSource? LoadIcon(string path)
     {
         try

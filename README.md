@@ -89,7 +89,7 @@ Add applications that Minimemizer should ignore, and manage default zone rules f
 
 ### About
 
-Displays the version, architecture, update status, and installation mode. Version 0.8.0 is available for ARM64 and x64. This page can check for updates, install a verified update, install a portable copy, or uninstall an installed copy.
+Displays the version, architecture, update status, and installation mode. Version 0.8.1 is available for ARM64 and x64. This page can check for updates, install a verified update, install a portable copy, or uninstall an installed copy.
 
 ## Installation, updates, and removal
 
@@ -109,6 +109,7 @@ Automatic checks require the GitHub repository and its release assets to be anon
 - A thumbnail is created automatically when an application is minimized.
 - Desktop icons can be hidden or shown from the tray menu or, when enabled, by double-clicking an empty desktop area.
 - Thumbnails can follow desktop icon visibility or be included temporarily by holding the configured modifier key.
+- DWM previews and application icon badges are refreshed automatically after sleep or hibernation.
 - Thumbnail windows are excluded from Windows Task View and Alt+Tab.
 - The thumbnail is removed when the application is restored or closed.
 - After dragging a thumbnail away from its default corner, select `⋯` to pin the application's other open thumbnails there or make the corner its persistent default.

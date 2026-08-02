@@ -441,6 +441,21 @@ internal sealed class ThumbnailWindow : Window
         _aboveTitleText.Text = shortened;
     }
 
+    internal void RefreshAfterResume()
+    {
+        if (_handle == 0 || !NativeMethods.IsWindow(_source) || !NativeMethods.IsIconic(_source)) return;
+        ApplyTaskViewMode();
+        Unregister();
+        if (NativeMethods.DwmRegisterThumbnail(_handle, _source, out _thumbnail) == 0)
+            UpdateThumbnail();
+
+        InvalidateVisual();
+        UpdateLayout();
+        _iconBadge?.RefreshAfterResume();
+        ApplyIconPosition(_showIcon);
+        SendToBottom();
+    }
+
     private void ApplyIconPosition(bool visible)
     {
         var previewTop = _titleMode == ThumbnailTitleMode.AlwaysAbove ? _effectiveTitleBarHeightPixels : 0;
