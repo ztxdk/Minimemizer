@@ -444,13 +444,15 @@ internal sealed class ThumbnailWindow : Window
     internal void RefreshAfterResume()
     {
         if (_handle == 0 || !NativeMethods.IsWindow(_source) || !NativeMethods.IsIconic(_source)) return;
-        ApplyTaskViewMode();
-        Unregister();
-        if (NativeMethods.DwmRegisterThumbnail(_handle, _source, out _thumbnail) == 0)
-            UpdateThumbnail();
+        if (_thumbnail == 0 || NativeMethods.DwmQueryThumbnailSourceSize(_thumbnail, out _) != 0)
+        {
+            ApplyTaskViewMode();
+            Unregister();
+            NativeMethods.DwmRegisterThumbnail(_handle, _source, out _thumbnail);
+        }
+        UpdateThumbnail();
 
         InvalidateVisual();
-        UpdateLayout();
         _iconBadge?.RefreshAfterResume();
         ApplyIconPosition(_showIcon);
         SendToBottom();

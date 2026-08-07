@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Collections.Concurrent;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
@@ -10,9 +11,18 @@ namespace Minimemizer;
 internal sealed class IconBadgeWindow : Window
 {
     private const int BadgeSize = 38;
+    private static readonly ConcurrentDictionary<string, Task<BitmapSource?>> IconCache =
+        new(StringComparer.OrdinalIgnoreCase);
     private nint _handle;
     private readonly Window _owner;
-    private readonly System.Windows.Controls.Image? _iconImage;
+    private System.Windows.Controls.Image? _iconImage;
+    private int _thumbnailX;
+    private int _thumbnailY;
+    private int _thumbnailWidth;
+    private int _thumbnailHeight;
+    private ThumbnailIconPosition _position;
+    private bool _requestedVisible;
+    private bool _closed;
 
     internal IconBadgeWindow(Window owner, string executablePath)
     {
@@ -29,18 +39,8 @@ internal sealed class IconBadgeWindow : Window
         Width = BadgeSize;
         Height = BadgeSize;
 
-        var image = LoadIcon(executablePath);
-        if (image is null) return;
-        _iconImage = new System.Windows.Controls.Image { Source = image, Stretch = Stretch.Uniform };
-        Content = new Border
-        {
-            CornerRadius = new CornerRadius(8),
-            BorderThickness = new Thickness(0),
-            BorderBrush = System.Windows.Media.Brushes.Transparent,
-            Background = System.Windows.Media.Brushes.Transparent,
-            Padding = new Thickness(4),
-            Child = _iconImage
-        };
+        Closed += (_, _) => _closed = true;
+        LoadIconAsync(executablePath);
         SourceInitialized += (_, _) =>
         {
             _handle = new WindowInteropHelper(this).Handle;
@@ -54,6 +54,12 @@ internal sealed class IconBadgeWindow : Window
 
     internal void ApplyPosition(int thumbnailX, int thumbnailY, int thumbnailWidth, int thumbnailHeight, ThumbnailIconPosition position, bool visible)
     {
+        _thumbnailX = thumbnailX;
+        _thumbnailY = thumbnailY;
+        _thumbnailWidth = thumbnailWidth;
+        _thumbnailHeight = thumbnailHeight;
+        _position = position;
+        _requestedVisible = visible;
         if (!HasIcon) return;
         var onRight = position is ThumbnailIconPosition.TopRight or ThumbnailIconPosition.BottomRight;
         var centered = position is ThumbnailIconPosition.TopCenter or ThumbnailIconPosition.BottomCenter;
@@ -81,9 +87,32 @@ internal sealed class IconBadgeWindow : Window
     internal void RefreshAfterResume()
     {
         if (!HasIcon) return;
-        if (IsVisible) Hide();
         InvalidateVisual();
-        UpdateLayout();
+    }
+
+    private async void LoadIconAsync(string path)
+    {
+        try
+        {
+            var task = IconCache.GetOrAdd(path, static value => Task.Run(() => LoadIcon(value)));
+            var image = await task.ConfigureAwait(true);
+            if (image is null || _closed) return;
+            _iconImage = new System.Windows.Controls.Image { Source = image, Stretch = Stretch.Uniform };
+            Content = new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                BorderThickness = new Thickness(0),
+                BorderBrush = System.Windows.Media.Brushes.Transparent,
+                Background = System.Windows.Media.Brushes.Transparent,
+                Padding = new Thickness(4),
+                Child = _iconImage
+            };
+            ApplyPosition(_thumbnailX, _thumbnailY, _thumbnailWidth, _thumbnailHeight, _position, _requestedVisible);
+        }
+        catch
+        {
+            // Icon badges are optional; thumbnail creation must not fail with them.
+        }
     }
 
     private static BitmapSource? LoadIcon(string path)

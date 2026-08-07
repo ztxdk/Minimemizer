@@ -84,7 +84,7 @@ public sealed class WindowManager : IDisposable
 
     private bool Add(nint hwnd, bool relayout = true)
     {
-        if (_disposed || !NativeMethods.IsIconic(hwnd) || !IsEligible(hwnd)) return false;
+        if (_disposed || !NativeMethods.IsIconic(hwnd) || !TryGetEligiblePath(hwnd, out var executablePath)) return false;
         if (_thumbnails.TryGetValue(hwnd, out var existing))
         {
             if (existing.MatchesSource(hwnd)) return false;
@@ -93,7 +93,7 @@ public sealed class WindowManager : IDisposable
 
         var titleBuffer = new StringBuilder(512);
         NativeMethods.GetWindowText(hwnd, titleBuffer, titleBuffer.Capacity);
-        var window = new ThumbnailWindow(hwnd, titleBuffer.ToString(), NativeMethods.GetProcessPath(hwnd),
+        var window = new ThumbnailWindow(hwnd, titleBuffer.ToString(), executablePath,
             _taskViewOwner.WindowHandle);
         window.DragStarted += OnDragStarted;
         window.DragMoved += OnDragMoved;
@@ -112,7 +112,23 @@ public sealed class WindowManager : IDisposable
         return true;
     }
 
-    private bool IsEligible(nint hwnd)
+    private bool TryGetEligiblePath(nint hwnd, out string path)
+    {
+        path = "";
+        if (!IsStructurallyEligible(hwnd)) return false;
+        path = NativeMethods.GetProcessPath(hwnd);
+        return IsEligible(hwnd, path);
+    }
+
+    private bool IsEligible(nint hwnd, string path)
+    {
+        if (!IsStructurallyEligible(hwnd)) return false;
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        if (string.Equals(path, Environment.ProcessPath, StringComparison.OrdinalIgnoreCase)) return false;
+        return !_store.Current.ExcludedPaths.Contains(path, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static bool IsStructurallyEligible(nint hwnd)
     {
         if (!NativeMethods.IsWindow(hwnd) || !NativeMethods.IsWindowVisible(hwnd) || NativeMethods.IsWindowCloaked(hwnd)) return false;
         var owner = NativeMethods.GetWindow(hwnd, 4); // GW_OWNER
@@ -121,10 +137,7 @@ public sealed class WindowManager : IDisposable
         if (owner != 0 && (style & NativeMethods.WS_EX_APPWINDOW) == 0) return false;
         var title = new StringBuilder(2);
         if (NativeMethods.GetWindowText(hwnd, title, 2) == 0) return false;
-        var path = NativeMethods.GetProcessPath(hwnd);
-        if (string.IsNullOrWhiteSpace(path)) return false;
-        if (string.Equals(path, Environment.ProcessPath, StringComparison.OrdinalIgnoreCase)) return false;
-        return !_store.Current.ExcludedPaths.Contains(path, StringComparer.OrdinalIgnoreCase);
+        return true;
     }
 
     private bool Remove(nint hwnd, bool relayout = true, bool discardOverride = false)
@@ -212,8 +225,9 @@ public sealed class WindowManager : IDisposable
         foreach (var pair in _thumbnails.ToArray())
         {
             var exists = NativeMethods.IsWindow(pair.Key);
-            if (!exists || !NativeMethods.IsIconic(pair.Key) || !IsEligible(pair.Key) || !pair.Value.MatchesSource(pair.Key))
-                changed |= Remove(pair.Key, relayout: false, discardOverride: !exists || !pair.Value.MatchesSource(pair.Key));
+            var matchesSource = exists && pair.Value.MatchesSource(pair.Key);
+            if (!exists || !NativeMethods.IsIconic(pair.Key) || !matchesSource || !IsEligible(pair.Key, pair.Value.ExecutablePath))
+                changed |= Remove(pair.Key, relayout: false, discardOverride: !exists || !matchesSource);
             else
                 pair.Value.RefreshTitle();
         }
