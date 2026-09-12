@@ -21,13 +21,19 @@ internal sealed class DesktopIconService : IDisposable
     private readonly Dispatcher _dispatcher;
     private readonly Action<string> _showError;
     private readonly NativeMethods.LowLevelMouseProc _mouseCallback;
-    private readonly BlockingCollection<DesktopClick> _clicks = new();
+    private readonly BlockingCollection<DesktopClick> _clicks = new(64);
+    private readonly Thread _mouseThread;
+    private readonly Dispatcher _mouseDispatcher;
     private readonly Thread _hitTestThread;
     private readonly DispatcherTimer _stateTimer;
     private nint _mouseHook;
     private NativeMethods.Point _mouseDownPoint;
     private bool _leftButtonDown;
     private bool _dragged;
+    private int _modifierVirtualKey = 0x11;
+    private int _settingsGeneration;
+    private int _mouseGeneration;
+    private System.Drawing.Size _dragSize;
     private bool _modifierThumbnailFollow;
     private bool _disposed;
 
@@ -38,6 +44,27 @@ internal sealed class DesktopIconService : IDisposable
         _dispatcher = System.Windows.Application.Current.Dispatcher;
         _showError = showError;
         _mouseCallback = MouseHook;
+        // Low-level hooks run on the installing thread. Never install this hook
+        // on the WPF thread: thumbnail creation would then stall global input.
+        var ready = new TaskCompletionSource<Dispatcher>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _mouseThread = new Thread(() =>
+        {
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            ready.SetResult(dispatcher);
+            try { Dispatcher.Run(); }
+            finally
+            {
+                ReleaseMouseHook();
+                _clicks.CompleteAdding();
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "Minimemizer mouse hook"
+        };
+        _mouseThread.SetApartmentState(ApartmentState.STA);
+        _mouseThread.Start();
+        _mouseDispatcher = ready.Task.GetAwaiter().GetResult();
         _hitTestThread = new Thread(ProcessDesktopClicks)
         {
             IsBackground = true,
@@ -60,8 +87,23 @@ internal sealed class DesktopIconService : IDisposable
     {
         if (_disposed) return;
         _modifierThumbnailFollow = false;
-        if (_store.Current.ToggleDesktopIconsOnEmptyDoubleClick) InstallMouseHook();
-        else ReleaseMouseHook();
+        var enabled = _store.Current.ToggleDesktopIconsOnEmptyDoubleClick;
+        var generation = ++_settingsGeneration;
+        var virtualKey = _store.Current.DesktopIconsModifier switch
+        {
+            DesktopIconModifier.Shift => 0x10,
+            DesktopIconModifier.Alt => 0x12,
+            _ => 0x11
+        };
+        var dragSize = Forms.SystemInformation.DragSize;
+        _mouseDispatcher.BeginInvoke(() =>
+        {
+            ReleaseMouseHook();
+            _mouseGeneration = generation;
+            _modifierVirtualKey = virtualKey;
+            _dragSize = dragSize;
+            if (enabled) InstallMouseHook();
+        });
 
         if (_store.Current.HideThumbnailsWithDesktopIcons)
             SynchronizeThumbnailVisibility();
@@ -99,7 +141,14 @@ internal sealed class DesktopIconService : IDisposable
         if (_mouseHook != 0) return;
         _mouseHook = NativeMethods.SetWindowsHookEx(WhMouseLl, _mouseCallback, NativeMethods.GetModuleHandle(null), 0);
         if (_mouseHook == 0)
-            _showError(Localizer.T(_store.Current.Language, "Dobbeltklik på skrivebordet kunne ikke aktiveres."));
+        {
+            var generation = _mouseGeneration;
+            _dispatcher.BeginInvoke(() =>
+            {
+                if (!_disposed && generation == _settingsGeneration)
+                    _showError(Localizer.T(_store.Current.Language, "Dobbeltklik på skrivebordet kunne ikke aktiveres."));
+            });
+        }
     }
 
     private nint MouseHook(int code, nint message, nint data)
@@ -115,7 +164,7 @@ internal sealed class DesktopIconService : IDisposable
                     _dragged = false;
                     break;
                 case WmMouseMove when _leftButtonDown:
-                    var dragSize = Forms.SystemInformation.DragSize;
+                    var dragSize = _dragSize;
                     if (Math.Abs(value.Point.X - _mouseDownPoint.X) >= Math.Max(1, dragSize.Width / 2) ||
                         Math.Abs(value.Point.Y - _mouseDownPoint.Y) >= Math.Max(1, dragSize.Height / 2))
                         _dragged = true;
@@ -123,7 +172,8 @@ internal sealed class DesktopIconService : IDisposable
                 case WmLeftButtonUp:
                     if (_leftButtonDown && !_dragged && !_clicks.IsAddingCompleted)
                     {
-                        try { _clicks.TryAdd(new DesktopClick(value.Point, value.Time, IsConfiguredModifierDown())); }
+                        try { _clicks.TryAdd(new DesktopClick(value.Point, value.Time,
+                            (NativeMethods.GetAsyncKeyState(_modifierVirtualKey) & 0x8000) != 0, _mouseGeneration)); }
                         catch (InvalidOperationException) { }
                     }
                     _leftButtonDown = false;
@@ -150,19 +200,25 @@ internal sealed class DesktopIconService : IDisposable
                 if (previous is { } first && IsDoubleClick(first, click))
                 {
                     previous = null;
-                    _dispatcher.BeginInvoke(() => ToggleIcons(click.ModifierDown));
+                    _dispatcher.BeginInvoke(() =>
+                    {
+                        if (!_disposed && click.Generation == _settingsGeneration)
+                            ToggleIcons(click.ModifierDown);
+                    });
                 }
                 else
                     previous = click;
             }
         }
         catch (ObjectDisposedException) { }
+        finally { _clicks.Dispose(); }
     }
 
     private static bool IsDoubleClick(DesktopClick first, DesktopClick second)
     {
         var size = Forms.SystemInformation.DoubleClickSize;
-        return unchecked(second.Time - first.Time) <= NativeMethods.GetDoubleClickTime() &&
+        return first.Generation == second.Generation &&
+               unchecked(second.Time - first.Time) <= NativeMethods.GetDoubleClickTime() &&
                Math.Abs(second.Point.X - first.Point.X) <= Math.Max(1, size.Width / 2) &&
                Math.Abs(second.Point.Y - first.Point.Y) <= Math.Max(1, size.Height / 2);
     }
@@ -222,17 +278,6 @@ internal sealed class DesktopIconService : IDisposable
             _stateTimer.Stop();
     }
 
-    private bool IsConfiguredModifierDown()
-    {
-        var virtualKey = _store.Current.DesktopIconsModifier switch
-        {
-            DesktopIconModifier.Shift => 0x10,
-            DesktopIconModifier.Alt => 0x12,
-            _ => 0x11
-        };
-        return (NativeMethods.GetAsyncKeyState(virtualKey) & 0x8000) != 0;
-    }
-
     private static bool TryGetIconsVisible(out bool visible)
     {
         visible = true;
@@ -285,13 +330,12 @@ internal sealed class DesktopIconService : IDisposable
         if (_disposed) return;
         _disposed = true;
         _stateTimer.Stop();
-        ReleaseMouseHook();
-        _clicks.CompleteAdding();
-        if (!_hitTestThread.Join(1000)) _hitTestThread.Interrupt();
-        _clicks.Dispose();
+        // Unhook on the installing thread. Do not wait on the UI thread for
+        // desktop automation, which can be blocked inside Explorer.
+        _mouseDispatcher.BeginInvokeShutdown(DispatcherPriority.Send);
     }
 
-    private readonly record struct DesktopClick(NativeMethods.Point Point, uint Time, bool ModifierDown);
+    private readonly record struct DesktopClick(NativeMethods.Point Point, uint Time, bool ModifierDown, int Generation);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct MouseHookData

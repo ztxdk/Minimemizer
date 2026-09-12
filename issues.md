@@ -254,3 +254,15 @@ Minimemizer skal automatisk kontrollere, om der findes en opdatering, når progr
 - Bevar den korte opstartsforsinkelse, så netværkskaldet ikke forsinker selve programstarten.
 - Vis en diskret notifikation, hvis en nyere version findes, uden automatisk download eller installation.
 - Test både automatisk opstartstjek, fravalg i Settings, offline-start og manuelt “Søg nu”.
+
+---
+
+## 20. Museinput hakker ved første minimering og efter inaktivitet
+**Fil:** `DesktopIconService.cs`
+**Alvor:** Høj — rettelse implementeret i v0.8.3
+
+Det globale low-level muse-hook til dobbeltklik på skrivebordet var installeret på WPF-tråden. Arbejde med thumbnail-oprettelse kunne derfor forsinke museinput på tværs af programmer.
+
+**Rettelse:** Hooket installeres og fjernes nu på en dedikeret tråd med egen beskedløkke. Klik behandles fortsat på en separat baggrundstråd. Klikkøen er begrænset, og ventende klik fra tidligere indstillinger ignoreres. Nedlukning venter ikke længere på Explorer/UI Automation på UI-tråden.
+
+**Validering:** Release-build samt kontrol af native hook-installation, separat tråd, fremdrift mens UI-tråden er blokeret, deaktivering, genaktivering og frigivelse ved nedlukning bestod. Den oprindelige oplevelse efter opstart og længere inaktivitet skal fortsat bekræftes i almindelig brug.
