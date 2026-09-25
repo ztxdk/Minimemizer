@@ -93,7 +93,7 @@ public partial class App : Application
             Visible = true
         };
         _tray.BalloonTipClicked += (_, _) => Dispatcher.Invoke(() => ShowSettings("about"));
-        _updates = new UpdateService(_store, _runtimeState);
+        _updates = new UpdateService(_store);
         _updates.UpdateAvailable += UpdateAvailable;
         _tray.DoubleClick += (_, _) => ShowSettings();
         _tray.MouseUp += (_, args) =>

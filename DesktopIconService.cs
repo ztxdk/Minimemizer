@@ -26,6 +26,7 @@ internal sealed class DesktopIconService : IDisposable
     private readonly Dispatcher _mouseDispatcher;
     private readonly Thread _hitTestThread;
     private readonly DispatcherTimer _stateTimer;
+    private readonly DesktopIconLayoutService _iconLayouts;
     private nint _mouseHook;
     private NativeMethods.Point _mouseDownPoint;
     private bool _leftButtonDown;
@@ -43,6 +44,7 @@ internal sealed class DesktopIconService : IDisposable
         _manager = manager;
         _dispatcher = System.Windows.Application.Current.Dispatcher;
         _showError = showError;
+        _iconLayouts = new DesktopIconLayoutService(store);
         _mouseCallback = MouseHook;
         // Low-level hooks run on the installing thread. Never install this hook
         // on the WPF thread: thumbnail creation would then stall global input.
@@ -110,6 +112,7 @@ internal sealed class DesktopIconService : IDisposable
         else
             _manager.SetThumbnailsVisible(true);
         UpdateStateMonitoring();
+        _iconLayouts.ApplySettings();
     }
 
     internal void ToggleIcons() => ToggleIcons(includeThumbnailsForThisToggle: false);
@@ -286,7 +289,7 @@ internal sealed class DesktopIconService : IDisposable
         return true;
     }
 
-    private static bool TryGetDesktopView(out nint view, out nint listView)
+    internal static bool TryGetDesktopView(out nint view, out nint listView)
     {
         view = 0;
         listView = 0;
@@ -330,6 +333,7 @@ internal sealed class DesktopIconService : IDisposable
         if (_disposed) return;
         _disposed = true;
         _stateTimer.Stop();
+        _iconLayouts.Dispose();
         // Unhook on the installing thread. Do not wait on the UI thread for
         // desktop automation, which can be blocked inside Explorer.
         _mouseDispatcher.BeginInvokeShutdown(DispatcherPriority.Send);

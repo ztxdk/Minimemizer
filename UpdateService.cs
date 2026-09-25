@@ -17,7 +17,6 @@ internal sealed class UpdateService : IDisposable
 {
     private const string LatestReleaseApi = "https://api.github.com/repos/ztxdk/Minimemizer/releases/latest";
     private readonly SettingsStore _settings;
-    private readonly RuntimeStateStore _state;
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(30) };
     private bool _busy;
 
@@ -27,10 +26,9 @@ internal sealed class UpdateService : IDisposable
     internal event EventHandler? StateChanged;
     internal event EventHandler<AvailableUpdate>? UpdateAvailable;
 
-    internal UpdateService(SettingsStore settings, RuntimeStateStore state)
+    internal UpdateService(SettingsStore settings)
     {
         _settings = settings;
-        _state = state;
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("Minimemizer/" + CurrentVersion);
         _http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
     }
@@ -47,7 +45,6 @@ internal sealed class UpdateService : IDisposable
     internal async Task CheckAutomaticallyAsync()
     {
         if (!_settings.Current.AutomaticUpdateChecks) return;
-        if (_state.Current.LastUpdateCheckUtc is { } last && DateTimeOffset.UtcNow - last < TimeSpan.FromHours(24)) return;
         await Task.Delay(TimeSpan.FromSeconds(15));
         await CheckAsync(force: false);
     }
@@ -77,8 +74,6 @@ internal sealed class UpdateService : IDisposable
                 ? new AvailableUpdate(version, release.HtmlUrl,
                     new UpdateAsset(asset.Name, asset.BrowserDownloadUrl, asset.Size, asset.Digest ?? ""))
                 : null;
-            _state.Current.LastUpdateCheckUtc = DateTimeOffset.UtcNow;
-            _state.Save();
             ErrorMessage = null;
             SetStatus(Available is null ? UpdateStatus.UpToDate : UpdateStatus.Available);
             if (Available is not null) UpdateAvailable?.Invoke(this, Available);

@@ -31,6 +31,7 @@ public sealed class AppSettings
     public bool AutoStart { get; set; }
     public bool AutomaticUpdateChecks { get; set; } = true;
     public bool ToggleDesktopIconsOnEmptyDoubleClick { get; set; }
+    public bool RememberDesktopIconPositions { get; set; }
     public bool HideThumbnailsWithDesktopIcons { get; set; }
     public DesktopIconModifier DesktopIconsModifier { get; set; } = DesktopIconModifier.Control;
     public bool ShowProgramIcon { get; set; } = true;

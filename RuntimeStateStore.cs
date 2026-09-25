@@ -5,7 +5,6 @@ namespace Minimemizer;
 
 internal sealed class RuntimeState
 {
-    public DateTimeOffset? LastUpdateCheckUtc { get; set; }
     public List<string> PortablePromptDismissedPaths { get; set; } = [];
 }
 

@@ -50,8 +50,9 @@ The settings window follows the Windows light or dark theme. The interface suppo
 
 - **Language:** Choose English or Danish.
 - **Start with Windows:** Start Minimemizer automatically when you sign in.
-- **Check for updates automatically:** Check GitHub Releases at most once per day. Downloads and installation always require confirmation.
+- **Check for updates automatically:** Check GitHub Releases every time Minimemizer starts. Downloads and installation always require confirmation.
 - **Double-click the desktop:** Optionally hide or show normal Windows desktop icons by double-clicking an empty area.
+- **Remember icon positions:** Automatically save a separate desktop-icon layout for each display count, resolution, and arrangement, then restore the matching layout when the display configuration returns.
 - **Hide desktop content:** Choose whether the normal desktop toggle hides only icons or icons and Minimemizer thumbnails.
 - **Modifier key:** In **Icons only** mode, hold the selected Ctrl, Shift, or Alt key during the desktop double-click to include thumbnails for that toggle.
 - **Open thumbnail:** Choose single-click or double-click.
@@ -89,7 +90,7 @@ Add applications that Minimemizer should ignore, and manage default zone rules f
 
 ### About
 
-Displays the version, architecture, update status, and installation mode. Version 0.8.3 is available for ARM64 and x64. This page can check for updates, install a verified update, install a portable copy, or uninstall an installed copy.
+Displays the installed version, architecture, update status, and installation mode. This page can check for updates, install a verified update, install a portable copy, or uninstall an installed copy.
 
 ## Installation, updates, and removal
 
@@ -108,6 +109,7 @@ Automatic checks require the GitHub repository and its release assets to be anon
 
 - A thumbnail is created automatically when an application is minimized.
 - Desktop icons can be hidden or shown from the tray menu or, when enabled, by double-clicking an empty desktop area.
+- Desktop icon positions can follow display configurations automatically. A configuration that has not been seen before starts with the most recently used positions.
 - Thumbnails can follow desktop icon visibility or be included temporarily by holding the configured modifier key.
 - DWM previews and application icon badges are refreshed automatically after sleep or hibernation.
 - Thumbnail windows are excluded from Windows Task View and Alt+Tab.
@@ -123,6 +125,7 @@ Automatic checks require the GitHub repository and its release assets to be anon
 - Protected video, DRM content, and some specially rendered applications may display a black, empty, or frozen preview.
 - Applications running with elevated administrator privileges may not always be fully controllable by a normally started Minimemizer process.
 - Windows 11 taskbar jump lists cannot be opened for other applications through a public Windows API. Thumbnail right-click therefore uses the classic window menu.
+- Desktop icon profiles require Windows' **Auto arrange icons** option to be turned off. **Align icons to grid** can remain enabled.
 
 ## Troubleshooting
 
