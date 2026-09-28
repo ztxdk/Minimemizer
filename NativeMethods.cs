@@ -14,6 +14,7 @@ internal static class NativeMethods
     internal const uint WINEVENT_SKIPOWNPROCESS = 2;
     internal const int OBJID_WINDOW = 0;
     internal const int CHILDID_SELF = 0;
+    internal const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
     internal const int DWMWA_CLOAKED = 14;
     internal const int GWL_EXSTYLE = -20;
     internal const int GWL_STYLE = -16;
@@ -80,6 +81,9 @@ internal static class NativeMethods
     [DllImport("user32.dll")] internal static extern nint SendMessage(nint hwnd, uint message, nint wParam, nint lParam);
     [DllImport("user32.dll", SetLastError = true)] internal static extern nint SendMessageTimeout(nint hwnd, uint message, nint wParam, nint lParam, uint flags, uint timeout, out nint result);
     [DllImport("user32.dll")] internal static extern bool GetClientRect(nint hwnd, out Rect rect);
+    [DllImport("user32.dll")] internal static extern bool GetWindowRect(nint hwnd, out Rect rect);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern bool GetWindowPlacement(nint hwnd, ref WindowPlacement placement);
+    [DllImport("user32.dll", SetLastError = true)] internal static extern bool SetWindowPlacement(nint hwnd, [In] ref WindowPlacement placement);
     internal delegate nint LowLevelMouseProc(int code, nint wParam, nint lParam);
     [DllImport("user32.dll")] internal static extern nint SetWindowsHookEx(int hookId, LowLevelMouseProc callback, nint module, uint threadId);
     [DllImport("user32.dll")] internal static extern bool UnhookWindowsHookEx(nint hook);
@@ -100,12 +104,22 @@ internal static class NativeMethods
     [DllImport("dwmapi.dll")] internal static extern int DwmQueryThumbnailSourceSize(nint thumbnail, out Size sourceSize);
     [DllImport("dwmapi.dll")] internal static extern int DwmSetWindowAttribute(nint hwnd, int attribute, ref int value, int valueSize);
     [DllImport("dwmapi.dll")] internal static extern int DwmGetWindowAttribute(nint hwnd, int attribute, out int value, int valueSize);
+    [DllImport("dwmapi.dll")] internal static extern int DwmGetWindowAttribute(nint hwnd, int attribute, out Rect value, int valueSize);
     [DllImport("dwmapi.dll")] internal static extern int DwmExtendFrameIntoClientArea(nint hwnd, ref Margins margins);
 
     [StructLayout(LayoutKind.Sequential)] internal struct Rect { public int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential)] internal struct Size { public int Width, Height; }
     [StructLayout(LayoutKind.Sequential)] internal struct Point { public int X, Y; }
     [StructLayout(LayoutKind.Sequential)] internal struct Margins { public int Left, Right, Top, Bottom; }
+    [StructLayout(LayoutKind.Sequential)] internal struct WindowPlacement
+    {
+        public uint Length;
+        public uint Flags;
+        public uint ShowCommand;
+        public Point MinPosition;
+        public Point MaxPosition;
+        public Rect NormalPosition;
+    }
     [StructLayout(LayoutKind.Sequential)] internal struct DwmThumbnailProperties
     {
         public uint Flags;
@@ -131,5 +145,5 @@ internal static class NativeMethods
     }
 
     internal static bool IsWindowCloaked(nint hwnd) =>
-        DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, out var cloaked, sizeof(int)) == 0 && cloaked != 0;
+        DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, out int cloaked, sizeof(int)) == 0 && cloaked != 0;
 }

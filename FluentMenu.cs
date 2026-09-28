@@ -1,9 +1,7 @@
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Markup;
 using Microsoft.Win32;
-using Point = System.Windows.Point;
 
 namespace Minimemizer;
 
@@ -31,7 +29,7 @@ internal static class FluentMenu
         var hover = dark ? "#FF3A3A3A" : "#FFE8E8E8";
         var line = dark ? "#FF474747" : "#FFD8D8D8";
 
-        var menu = new DismissibleContextMenu
+        var menu = new ContextMenu
         {
             StaysOpen = false,
             MaxHeight = Math.Max(160, SystemParameters.WorkArea.Height - 24)
@@ -52,70 +50,5 @@ internal static class FluentMenu
         <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="{x:Type Separator}"><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="{x:Type Separator}"><Border Height="1" Margin="8,4" Background="{{{line}}}"/></ControlTemplate></Setter.Value></Setter></Style>
         """);
         return menu;
-    }
-}
-
-internal sealed class DismissibleContextMenu : ContextMenu
-{
-    private const int WhMouseLl = 14;
-    private const int WmLeftButtonDown = 0x0201;
-    private const int WmRightButtonDown = 0x0204;
-    private const int WmMiddleButtonDown = 0x0207;
-    private readonly NativeMethods.LowLevelMouseProc _mouseCallback;
-    private nint _mouseHook;
-    private bool _closeQueued;
-
-    internal DismissibleContextMenu()
-    {
-        _mouseCallback = MouseHook;
-        Opened += (_, _) =>
-        {
-            _closeQueued = false;
-            _mouseHook = NativeMethods.SetWindowsHookEx(WhMouseLl, _mouseCallback, NativeMethods.GetModuleHandle(null), 0);
-        };
-        Closed += (_, _) => ReleaseHook();
-    }
-
-    private nint MouseHook(int code, nint message, nint data)
-    {
-        if (code >= 0 && !_closeQueued &&
-            message.ToInt32() is WmLeftButtonDown or WmRightButtonDown or WmMiddleButtonDown)
-        {
-            var point = Marshal.PtrToStructure<MouseHookData>(data).Point;
-            if (!ContainsScreenPoint(point))
-            {
-                _closeQueued = true;
-                Dispatcher.BeginInvoke(() => IsOpen = false);
-            }
-        }
-        return NativeMethods.CallNextHookEx(_mouseHook, code, message, data);
-    }
-
-    private bool ContainsScreenPoint(NativeMethods.Point point)
-    {
-        try
-        {
-            var origin = PointToScreen(new Point(0, 0));
-            return point.X >= origin.X && point.X < origin.X + ActualWidth &&
-                   point.Y >= origin.Y && point.Y < origin.Y + ActualHeight;
-        }
-        catch (InvalidOperationException) { return false; }
-    }
-
-    private void ReleaseHook()
-    {
-        if (_mouseHook == 0) return;
-        NativeMethods.UnhookWindowsHookEx(_mouseHook);
-        _mouseHook = 0;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MouseHookData
-    {
-        internal NativeMethods.Point Point;
-        internal uint MouseData;
-        internal uint Flags;
-        internal uint Time;
-        internal nint ExtraInfo;
     }
 }

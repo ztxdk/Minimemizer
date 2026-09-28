@@ -21,7 +21,7 @@ The application icon is embedded in all official ARM64 and x64 builds and is als
 5. A thumbnail of the application appears on the desktop.
 6. Single- or double-click the thumbnail to restore the application.
 
-Minimemizer runs in the background and appears in the system tray next to the Windows clock. Right-click the tray icon to hide or show desktop icons, open **Settings**, or exit the application.
+Minimemizer runs in the background and appears in the system tray next to the Windows clock. Right-click the tray icon to hide or show desktop icons, rescue windows that are outside the visible displays, open **Settings**, or exit the application.
 
 > If the tray icon is not visible, it may be located under **Show hidden icons**.
 
@@ -109,6 +109,7 @@ Automatic checks require the GitHub repository and its release assets to be anon
 
 - A thumbnail is created automatically when an application is minimized.
 - Desktop icons can be hidden or shown from the tray menu or, when enabled, by double-clicking an empty desktop area.
+- **Rescue windows** in the tray menu can move one or all partly or completely off-screen windows to the primary display while preserving their minimized, normal, or maximized state.
 - Desktop icon positions can follow display configurations automatically. A configuration that has not been seen before starts with the most recently used positions.
 - Thumbnails can follow desktop icon visibility or be included temporarily by holding the configured modifier key.
 - DWM previews and application icon badges are refreshed automatically after sleep or hibernation.
@@ -182,11 +183,15 @@ Create a self-contained Windows ARM64 build:
 dotnet publish -c Release -r win-arm64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 ```
 
-The updater expects release assets to use these exact suffixes:
+For smaller framework-dependent builds, run the same commands with `--self-contained false`. These require the matching .NET 8 Desktop Runtime on the destination computer.
+
+The updater and download documentation expect these exact release-asset suffixes:
 
 ```text
 -win-x64-self-contained.exe
 -win-arm64-self-contained.exe
+-win-x64-requires-dotnet8.exe
+-win-arm64-requires-dotnet8.exe
 ```
 
 GitHub must expose a `sha256:` digest for an asset before the built-in updater will install it.

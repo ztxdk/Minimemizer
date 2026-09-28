@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
@@ -17,8 +18,11 @@ namespace Minimemizer;
 internal sealed class TrayMenuWindow : Window
 {
     private bool _isClosing;
+    private ContextMenu? _rescueMenu;
 
-    internal TrayMenuWindow(AppLanguage language, bool iconsVisible, Action toggleDesktopIcons, Action openSettings, Action exit)
+    internal TrayMenuWindow(AppLanguage language, bool iconsVisible, IReadOnlyList<OffscreenWindowCandidate> rescueCandidates,
+        Action toggleDesktopIcons, Action rescueAll, Action<OffscreenWindowCandidate> rescueWindow,
+        Action openSettings, Action exit)
     {
         Width = 238;
         SizeToContent = SizeToContent.Height;
@@ -39,6 +43,11 @@ internal sealed class TrayMenuWindow : Window
         var stack = new StackPanel { Margin = new Thickness(4) };
         stack.Children.Add(MenuButton("▦", Localizer.T(language, iconsVisible ? "Skjul skrivebordsikoner" : "Vis skrivebordsikoner"), foreground, hover, () => RunAndClose(toggleDesktopIcons)));
         stack.Children.Add(new Border { Height = 1, Background = borderBrush, Margin = new Thickness(7, 2, 7, 2) });
+        Border rescueButton = null!;
+        rescueButton = MenuButton("↗", $"{Localizer.T(language, "Red vinduer")} ({rescueCandidates.Count})", foreground, hover,
+            () => ShowRescueMenu(rescueButton, language, rescueCandidates, rescueAll, rescueWindow));
+        stack.Children.Add(rescueButton);
+        stack.Children.Add(new Border { Height = 1, Background = borderBrush, Margin = new Thickness(7, 2, 7, 2) });
         stack.Children.Add(MenuButton("⚙", Localizer.T(language, "Indstillinger"), foreground, hover, () => RunAndClose(openSettings)));
         stack.Children.Add(new Border { Height = 1, Background = borderBrush, Margin = new Thickness(7, 2, 7, 2) });
         stack.Children.Add(MenuButton("⏻", Localizer.T(language, "Afslut"), foreground, hover, () => RunAndClose(exit)));
@@ -53,6 +62,81 @@ internal sealed class TrayMenuWindow : Window
             Effect = new DropShadowEffect { BlurRadius = 10, ShadowDepth = 2, Opacity = dark ? .42 : .2 },
             Child = stack
         };
+    }
+
+    private void ShowRescueMenu(Border anchor, AppLanguage language,
+        IReadOnlyList<OffscreenWindowCandidate> candidates, Action rescueAll,
+        Action<OffscreenWindowCandidate> rescueWindow)
+    {
+        if (_rescueMenu is { IsOpen: true })
+        {
+            _rescueMenu.IsOpen = false;
+            return;
+        }
+
+        var menu = FluentMenu.Create(IsDarkMode());
+        var moveAll = new MenuItem
+        {
+            Header = Localizer.T(language, "Flyt alle til primær skærm"),
+            IsEnabled = candidates.Count > 0
+        };
+        moveAll.Click += (_, _) => RunAndClose(rescueAll);
+        menu.Items.Add(moveAll);
+        menu.Items.Add(new Separator());
+
+        if (candidates.Count == 0)
+        {
+            menu.Items.Add(new MenuItem
+            {
+                Header = Localizer.T(language, "Ingen vinduer uden for skærmen"),
+                IsEnabled = false
+            });
+        }
+        else
+        {
+            foreach (var item in BuildCandidateLabels(candidates))
+            {
+                var label = new TextBlock
+                {
+                    Text = item.Label,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    Width = 360,
+                    ToolTip = item.Candidate.Title
+                };
+                var menuItem = new MenuItem { Header = label };
+                menuItem.Click += (_, _) => RunAndClose(() => rescueWindow(item.Candidate));
+                menu.Items.Add(menuItem);
+            }
+        }
+
+        _rescueMenu = menu;
+        menu.Closed += (_, _) => { if (ReferenceEquals(_rescueMenu, menu)) _rescueMenu = null; };
+        menu.PlacementTarget = anchor;
+        menu.Placement = PlacementMode.Left;
+        menu.HorizontalOffset = -4;
+        menu.IsOpen = true;
+    }
+
+    private static IReadOnlyList<(OffscreenWindowCandidate Candidate, string Label)> BuildCandidateLabels(
+        IReadOnlyList<OffscreenWindowCandidate> candidates)
+    {
+        var titleCounts = candidates
+            .GroupBy(candidate => candidate.Title, StringComparer.CurrentCultureIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.CurrentCultureIgnoreCase);
+        var used = new Dictionary<string, int>(StringComparer.CurrentCultureIgnoreCase);
+        var result = new List<(OffscreenWindowCandidate, string)>(candidates.Count);
+        foreach (var candidate in candidates)
+        {
+            var label = candidate.Title;
+            if (titleCounts[candidate.Title] > 1 && !string.IsNullOrWhiteSpace(candidate.ProcessName))
+                label = $"{label} — {candidate.ProcessName}";
+            used.TryGetValue(label, out var number);
+            number++;
+            used[label] = number;
+            if (number > 1) label = $"{label} ({number})";
+            result.Add((candidate, label));
+        }
+        return result;
     }
 
     private static Border MenuButton(string glyph, string text, Brush foreground, Brush hover, Action action)
@@ -100,7 +184,14 @@ internal sealed class TrayMenuWindow : Window
     {
         if (_isClosing) return;
         _isClosing = true;
+        if (_rescueMenu is not null) _rescueMenu.IsOpen = false;
         Close();
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        if (_rescueMenu is not null) _rescueMenu.IsOpen = false;
+        base.OnClosed(e);
     }
 
     private static bool IsDarkMode()

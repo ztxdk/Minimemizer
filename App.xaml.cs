@@ -23,6 +23,7 @@ public partial class App : Application
     private DesktopIconService? _desktopIcons;
     private Icon? _trayIcon;
     private TrayMenuWindow? _trayMenuWindow;
+    private readonly OffscreenWindowService _offscreenWindows = new();
     private Mutex? _instanceMutex;
     private EventWaitHandle? _exitRequestedEvent;
     private RegisteredWaitHandle? _exitWaitRegistration;
@@ -300,10 +301,25 @@ public partial class App : Application
     {
         if (_store is null || _desktopIcons is null) return;
         _trayMenuWindow?.Close();
-        _trayMenuWindow = new TrayMenuWindow(_store.Current.Language, _desktopIcons.IconsVisible,
-            _desktopIcons.ToggleIcons, () => ShowSettings(), Shutdown);
+        var rescueCandidates = _offscreenWindows.FindCandidates();
+        _trayMenuWindow = new TrayMenuWindow(_store.Current.Language, _desktopIcons.IconsVisible, rescueCandidates,
+            _desktopIcons.ToggleIcons, RescueAllOffscreenWindows, RescueOffscreenWindow,
+            () => ShowSettings(), Shutdown);
         _trayMenuWindow.Closed += (_, _) => _trayMenuWindow = null;
         _trayMenuWindow.ShowNearCursor();
+    }
+
+    private void RescueAllOffscreenWindows() => ReportRescueResult(_offscreenWindows.RescueAll());
+
+    private void RescueOffscreenWindow(OffscreenWindowCandidate candidate) =>
+        ReportRescueResult(_offscreenWindows.Rescue(candidate));
+
+    private void ReportRescueResult(WindowRescueResult result)
+    {
+        if (result.Failed == 0 || _tray is null || _store is null) return;
+        _tray.BalloonTipTitle = "Minimemizer";
+        _tray.BalloonTipText = Localizer.T(_store.Current.Language, "Nogle vinduer kunne ikke flyttes til den primære skærm.");
+        _tray.ShowBalloonTip(5000);
     }
 
     protected override void OnExit(ExitEventArgs e)
